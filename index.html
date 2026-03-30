@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>QR出席管理テスト</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+</head>
+<body>
+<h2>QR出席管理テスト</h2>
+<video id="video" width="400" height="300" autoplay></video>
+<p id="message"></p>
+<button id="start">カメラ起動</button>
+
+<script>
+const backendUrl = "https://script.google.com/macros/s/AKfycbzxf6alIRN1AXsinGF2dUzxD-9-UfmvDPHHeMw39gex8UQzM-HFqwUvV1-XEALxih-JVw/exec"; // GAS doPostのURL
+const video = document.getElementById('video');
+const message = document.getElementById('message');
+const startBtn = document.getElementById('start');
+
+const canvas = document.createElement('canvas');
+const context = canvas.getContext('2d');
+
+let cooldown = false; 
+const cooldownTime = 3000;
+
+startBtn.addEventListener('click', () => {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => { 
+      video.srcObject = stream; 
+      message.textContent = "カメラ起動！QRをかざしてください";
+      scan(); // カメラ起動後に解析開始
+    })
+    .catch(err => { message.textContent = "カメラを起動できません: " + err; });
+});
+
+function scan() {
+  if(video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = 400;
+    canvas.height = 300;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+    if(code && !cooldown) {
+      cooldown = true;
+      message.textContent = "QR読み取り成功！送信中…";
+      try {
+        const data = JSON.parse(code.data); // QR内JSON想定
+        fetch(backendUrl, {
+          method: "POST",
+          body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+          message.textContent = `${data.name}さん、出席登録完了！`;
+          setTimeout(() => cooldown = false, cooldownTime);
+        })
+        .catch(err => {
+          message.textContent = "送信エラー: " + err;
+          cooldown = false;
+        });
+      } catch(e) {
+        message.textContent = "QRのJSON解析エラー";
+        console.error(e);
+        cooldown = false;
+      }
+    } else if (!code) {
+      message.textContent = "QR認識待機中…";
+    }
+  }
+  requestAnimationFrame(scan);
+}
+</script>
+</body>
+</html>
