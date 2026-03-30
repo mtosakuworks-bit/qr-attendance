@@ -50,9 +50,10 @@ function scan() {
           method: "POST",
           body: JSON.stringify(data)
         })
-        .then(res => res.json())
+        .then(res => res.text())
         .then(res => {
-          message.textContent = `${data.name}さん、出席登録完了！`;
+          console.log("GASレスポンス:", res);
+          message.textContent = res;
           setTimeout(() => cooldown = false, cooldownTime);
         })
         .catch(err => {
