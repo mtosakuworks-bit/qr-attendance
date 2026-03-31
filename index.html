@@ -14,31 +14,24 @@
       --bg: #f8fbfd;
     }
     body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
-    
     header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
     h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.1rem; }
 
     .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 50px; flex-grow: 1; }
 
-    /* カメラエリア：画面幅の7割 */
     #video-container { position: relative; width: 70%; max-width: 700px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 40px; }
     #video { width: 100%; height: 100%; object-fit: cover; }
-    
     .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; border: 5px dashed rgba(255,255,255,0.6); border-radius: 25px; pointer-events: none; }
 
-    /* ステータスバッジ：中央寄せ・大きく表示 */
     #status-badge { width: 85%; max-width: 650px; padding: 25px 15px; border-radius: 15px; font-weight: bold; font-size: 1.8rem; text-align: center; transition: 0.3s; line-height: 1.4; border: 3px solid transparent; box-sizing: border-box; }
-    
     .waiting { background: white; color: #555; border-color: #ddd; }
     .processing { background: var(--processing); color: #856404; border-color: #ffeeba; }
     .done { background: #d4edda; color: #155724; border-color: #c3e6cb; animation: bounce 0.5s; }
     .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
   </style>
 </head>
 <body>
-
   <header>
     <h1>塾 出席管理システム</h1>
   </header>
@@ -48,18 +41,16 @@
       <video id="video" autoplay playsinline></video>
       <div class="qr-guide"></div>
     </div>
-
     <div id="status-badge" class="waiting">QRコードを<br>かざしてください</div>
   </div>
 
   <script>
-    // 【重要】ここに最新のGASデプロイURLを入力してください
-    const backendUrl = "https://script.google.com/macros/s/AKfycby7Mbnb_D3djhieIf1KrRueMcpST8XjPHP9Qydy7KlqL7qov81Dg06mr3afm3txxLOotw/exec";
-    
+    const backendUrl = "https://script.google.com/macros/s/AKfycbxZpzWpz_Vk-L3pE-bmNcsnmyaRI0vpVS_sGgGW7PuENOHl22uCFmpIM6DRihI-unz7fQ/exec";
+
     const video = document.getElementById('video');
     const statusBadge = document.getElementById('status-badge');
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
     let isProcessing = false;
 
     // 音声通知
@@ -75,23 +66,34 @@
     }
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => { video.srcObject = stream; })
-      .catch(err => { statusBadge.textContent = "カメラエラー: " + err; statusBadge.className = "error"; });
+      .then(stream => video.srcObject = stream)
+      .catch(err => {
+        statusBadge.innerHTML = "カメラエラー:<br>" + err;
+        statusBadge.className = "error";
+      });
 
     function scan() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const code = jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const code = jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height);
 
         if (code) {
+          console.log("QR検出:", code.data);
           try {
             const data = JSON.parse(code.data);
+            console.log("parsed:", data);
             if (data.studentId && data.name) {
               registerAttendance(data);
+            } else {
+              throw new Error("QR内に studentId または name がありません");
             }
-          } catch (e) {}
+          } catch(e) {
+            console.error("QR解析エラー:", e, code.data);
+            statusBadge.innerHTML = "QR形式エラー";
+            statusBadge.className = "error";
+          }
         }
       }
       requestAnimationFrame(scan);
@@ -104,31 +106,29 @@
       statusBadge.className = "processing";
 
       fetch(backendUrl, { method: "POST", body: JSON.stringify(data) })
-      .then(res => res.json())
-      .then(res => {
-        if (res.status === "ok") {
-          // GASから返ってくる type (entry or exit) に基づいてメッセージを変更
-          const typeLabel = res.type === "entry" ? "入室" : "退室";
-          const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
-          
-          statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${data.name}さん、${greeting}`;
-          statusBadge.className = "done";
-        } else {
-          throw new Error(res.message);
-        }
-      })
-      .catch(() => {
-        statusBadge.innerHTML = "❌ エラー<br>もう一度かざしてください";
-        statusBadge.className = "error";
-      })
-      .finally(() => {
-        // 次の読み取りまで4秒待機（連投防止）
-        setTimeout(() => {
-          isProcessing = false;
-          statusBadge.innerHTML = "QRコードを<br>かざしてください";
-          statusBadge.className = "waiting";
-        }, 4000);
-      });
+        .then(res => res.json())
+        .then(res => {
+          if (res.status === "ok") {
+            const typeLabel = res.type === "entry" ? "入室" : "退室";
+            const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
+            statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${data.name}さん、${greeting}`;
+            statusBadge.className = "done";
+          } else {
+            throw new Error(res.message);
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          statusBadge.innerHTML = "❌ エラー<br>もう一度かざしてください";
+          statusBadge.className = "error";
+        })
+        .finally(() => {
+          setTimeout(() => {
+            isProcessing = false;
+            statusBadge.innerHTML = "QRコードを<br>かざしてください";
+            statusBadge.className = "waiting";
+          }, 4000);
+        });
     }
 
     requestAnimationFrame(scan);
