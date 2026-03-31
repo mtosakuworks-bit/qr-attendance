@@ -2,71 +2,107 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>QR出席管理テスト</title>
+<title>QR出席管理システム</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 20px; }
+  h2 { color: #2c3e50; }
+  #video { border: 4px solid #fff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; background: #000; }
+  #message { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #34495e; min-height: 1.5em; }
+  button { background: #3498db; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; transition: 0.3s; margin-top: 20px; }
+  button:hover { background: #2980b9; }
+  #flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(46, 204, 113, 0.4); display: none; z-index: 9999; pointer-events: none; }
+</style>
 </head>
 <body>
-<h2>QR出席管理テスト</h2>
-<video id="video" width="400" height="300" autoplay></video>
-<p id="message"></p>
+
+<div id="flash"></div>
+<h2>QR出席管理</h2>
+<video id="video" autoplay playsinline></video>
+<p id="message">カメラを起動してください</p>
 <button id="start">カメラ起動</button>
 
 <script>
-const backendUrl = "https://script.google.com/macros/s/AKfycbxOiKRhJeQV1vulfQ-okQ0MLUhcP7lPDwYsxlyqjXFilE9TXcqj3OfgKN6BLT4v4YNIjg/exec"; // GAS doPostのURL
+const backendUrl = "https://script.google.com/macros/s/AKfycbw7WHasovqd6KFDOuDSn2vbymS3N5eZNfK3w9DVkCIhVL6aIQ4dJ4FqsX1S9qvlyVldrw/exec"; 
 const video = document.getElementById('video');
 const message = document.getElementById('message');
 const startBtn = document.getElementById('start');
-
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
 
 let cooldown = false; 
 const cooldownTime = 3000;
 
+// 音声再生の関数
+function playBeep() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.4);
+}
+
+// 画面フラッシュ
+function flashScreen() {
+  const flash = document.getElementById('flash');
+  flash.style.display = 'block';
+  setTimeout(() => flash.style.display = 'none', 300);
+}
+
 startBtn.addEventListener('click', () => {
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => { 
       video.srcObject = stream; 
-      message.textContent = "カメラ起動！QRをかざしてください";
-      scan(); // カメラ起動後に解析開始
+      message.textContent = "QRをかざしてください";
+      startBtn.style.display = "none";
+      scan();
     })
-    .catch(err => { message.textContent = "カメラを起動できません: " + err; });
+    .catch(err => { message.textContent = "エラー: " + err; });
 });
 
 function scan() {
-  if(video.readyState === video.HAVE_ENOUGH_DATA) {
+  if(video.readyState === video.HAVE_ENOUGH_DATA && !cooldown) {
     canvas.width = 400;
     canvas.height = 300;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
     const code = jsQR(imageData.data, canvas.width, canvas.height);
-    if(code && !cooldown) {
+    
+    if(code) {
       cooldown = true;
-      message.textContent = "QR読み取り成功！送信中…";
       try {
-        const data = JSON.parse(code.data); // QR内JSON想定
+        const data = JSON.parse(code.data);
+        message.textContent = "送信中...";
+        
         fetch(backendUrl, {
           method: "POST",
+          mode: "no-cors",
           body: JSON.stringify(data)
         })
-        .then(res => res.text())
-        .then(res => {
-          console.log("GASレスポンス:", res);
-          message.textContent = res;
-          setTimeout(() => cooldown = false, cooldownTime);
+        .then(() => {
+          playBeep(); // 音！
+          flashScreen(); // 光！
+          message.textContent = "✔ 記録完了！";
+          setTimeout(() => {
+            cooldown = false;
+            message.textContent = "次のQRを待機中...";
+          }, cooldownTime);
         })
-        .catch(err => {
-          message.textContent = "送信エラー: " + err;
+        .catch(() => {
+          message.textContent = "送信に失敗しました";
           cooldown = false;
         });
       } catch(e) {
-        message.textContent = "QRのJSON解析エラー";
-        console.error(e);
-        cooldown = false;
+        message.textContent = "QRデータが正しくありません";
+        setTimeout(() => cooldown = false, 2000);
       }
-    } else if (!code) {
-      message.textContent = "QR認識待機中…";
     }
   }
   requestAnimationFrame(scan);
