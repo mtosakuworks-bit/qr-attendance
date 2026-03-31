@@ -3,69 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR出席管理・大画面スキャナー</title>
+  <title>塾 出席管理システム</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
   <style>
-    :root { --primary: #005bac; --success: #28a745; --bg: #eef2f7; }
-    body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    :root {
+      --primary: #00469b; /* 塾をイメージしたネイビー */
+      --success: #28a745; /* 成功時の緑 */
+      --processing: #fff3cd; /* 送信中の黄 */
+      --error: #dc3545; /* エラー時の赤 */
+      --bg: #f8fbfd; /* 清潔感のある薄い水色の背景 */
+    }
+    body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
     
-    header { background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
-    h1 { margin: 0; font-size: 1.2rem; }
-    #clock { font-size: 1.2rem; font-weight: bold; }
+    /* ヘッダー */
+    header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
+    h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.1rem; }
 
-    /* メインレイアウト：画面の7割をカメラに */
-    .container { display: flex; flex: 1; height: calc(100vh - 50px); overflow: hidden; }
+    /* メインコンテナ（中央寄せ） */
+    .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 50px; flex-grow: 1; }
 
-    /* 左側：カメラエリア（70%） */
-    .camera-section { flex: 7; position: relative; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px solid #ddd; }
-    #video { width: 100%; height: 100%; object-fit: cover; } /* 枠いっぱいに広げる */
+    /* カメラエリア：画面幅の7割に設定 */
+    #video-container { position: relative; width: 70%; max-width: 700px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 40px; }
+    #video { width: 100%; height: 100%; object-fit: cover; }
     
     /* ガイド枠（中央にうっすら表示） */
-    .qr-guide { position: absolute; width: 250px; height: 250px; border: 4px dashed rgba(255,255,255,0.5); border-radius: 20px; pointer-events: none; }
+    .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; border: 5px dashed rgba(255,255,255,0.6); border-radius: 25px; pointer-events: none; }
 
-    /* 右側：情報エリア（30%） */
-    .info-section { flex: 3; background: white; display: flex; flex-direction: column; padding: 20px; box-shadow: -5px 0 15px rgba(0,0,0,0.05); }
+    /* ステータスバッジ（カメラの下に配置、大きく見やすく） */
+    #status-badge { width: 80%; max-width: 600px; padding: 25px 15px; border-radius: 15px; font-weight: bold; font-size: 1.6rem; text-align: center; transition: 0.3s; line-height: 1.4; border: 3px solid transparent; box-sizing: border-box; }
     
-    /* 通知バッジ */
-    #status-badge { padding: 20px; border-radius: 10px; font-weight: bold; font-size: 1.4rem; text-align: center; margin-bottom: 30px; transition: 0.3s; line-height: 1.4; }
-    .waiting { background: #f8f9fa; color: #666; border: 2px solid #ddd; }
-    .processing { background: #fff3cd; color: #856404; border: 2px solid #ffeeba; }
-    .done { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; animation: bounce 0.5s; }
+    /* ステータス別のスタイル */
+    .waiting { background: white; color: #555; border-color: #ddd; }
+    .processing { background: var(--processing); color: #856404; border-color: #ffeeba; }
+    .done { background: #d4edda; color: #155724; border-color: #c3e6cb; animation: bounce 0.5s; }
+    .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
 
-    /* 履歴リスト */
-    .history-container { flex: 1; overflow-y: auto; }
-    .history-title { font-weight: bold; color: var(--primary); border-bottom: 2px solid var(--bg); padding-bottom: 8px; margin-bottom: 10px; }
-    .history-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; animation: slideIn 0.3s; }
-    .h-name { font-weight: bold; font-size: 1.1rem; }
-    .h-time { color: #888; font-size: 0.9rem; }
-
+    /* アニメーション */
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
   </style>
 </head>
 <body>
 
   <header>
     <h1>塾 出席管理システム</h1>
-    <div id="clock">00:00:00</div>
   </header>
 
   <div class="container">
-    <div class="camera-section">
+    <div id="video-container">
       <video id="video" autoplay playsinline></video>
       <div class="qr-guide"></div>
     </div>
 
-    <div class="info-section">
-      <div id="status-badge" class="waiting">QRコードを<br>かざしてください</div>
-      
-      <div class="history-container">
-        <div class="history-title">最近の受付記録</div>
-        <div id="history-list">
-          <div style="color:#ccc; text-align:center; padding-top:20px;">まだデータはありません</div>
-        </div>
-      </div>
-    </div>
+    <div id="status-badge" class="waiting">QRコードを<br>かざしてください</div>
   </div>
 
   <script>
@@ -73,20 +62,14 @@
     
     const video = document.getElementById('video');
     const statusBadge = document.getElementById('status-badge');
-    const historyList = document.getElementById('history-list');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     let isProcessing = false;
 
-    // 時計の更新
-    setInterval(() => {
-      const now = new Date();
-      document.getElementById('clock').textContent = now.toLocaleTimeString('ja-JP');
-    }, 1000);
-
-    // 音声通知
+    // 音声通知（ブラウザ制限対策：最初のタップで有効化）
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep() {
+      if (audioCtx.state === 'suspended') audioCtx.resume(); // スリープ対策
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain); gain.connect(audioCtx.destination);
@@ -95,9 +78,10 @@
       osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     }
 
+    // カメラ開始
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => { video.srcObject = stream; })
-      .catch(err => { statusBadge.textContent = "カメラエラー: " + err; });
+      .catch(err => { statusBadge.textContent = "カメラエラー: " + err; statusBadge.className = "error"; });
 
     function scan() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
@@ -120,7 +104,7 @@
 
     function registerAttendance(data) {
       isProcessing = true;
-      playBeep();
+      playBeep(); // 読み取り音
       statusBadge.innerHTML = "送信中...<br>" + data.name + "さん";
       statusBadge.className = "processing";
 
@@ -128,38 +112,26 @@
       .then(res => res.json())
       .then(res => {
         if (res.status === "ok") {
-          statusBadge.innerHTML = "✅ 受付完了<br>" + data.name + "さん";
+          statusBadge.innerHTML = "✅ 受付完了<br>" + data.name + "さん、こんにちは！";
           statusBadge.className = "done";
-          addHistory(data.name);
         }
       })
       .catch(() => {
-        statusBadge.innerHTML = "❌ エラー<br>再試行してください";
-        statusBadge.className = "waiting";
+        statusBadge.innerHTML = "❌ 送信エラー<br>もう一度かざしてください";
+        statusBadge.className = "error";
       })
       .finally(() => {
+        // 次の読み取りまで4秒待機（二重登録防止）
         setTimeout(() => {
           isProcessing = false;
           statusBadge.innerHTML = "QRコードを<br>かざしてください";
           statusBadge.className = "waiting";
-        }, 3500);
+        }, 4000);
       });
     }
 
-    function addHistory(name) {
-      const now = new Date();
-      const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-      const item = document.createElement('div');
-      item.className = 'history-item';
-      item.innerHTML = `<span class="h-name">${name}さん</span><span class="h-time">${timeStr} 受付</span>`;
-      
-      if (historyList.children[0] && historyList.children[0].style.color) historyList.innerHTML = '';
-      historyList.insertBefore(item, historyList.firstChild);
-      if (historyList.children.length > 8) historyList.removeChild(historyList.lastChild);
-    }
-
     requestAnimationFrame(scan);
-    // 最初のクリックでオーディオを有効化
+    // 最初のクリックでオーディオを有効化（重要）
     document.body.addEventListener('click', () => audioCtx.resume(), { once: true });
   </script>
 </body>
