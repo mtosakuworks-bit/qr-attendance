@@ -1,112 +1,164 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>QR出席管理システム</title>
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-<style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background: #f4f7f6; margin: 0; padding: 20px; }
-  h2 { color: #2c3e50; }
-  #video { border: 4px solid #fff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; background: #000; }
-  #message { margin-top: 20px; font-size: 1.2em; font-weight: bold; color: #34495e; min-height: 1.5em; }
-  button { background: #3498db; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; transition: 0.3s; margin-top: 20px; }
-  button:hover { background: #2980b9; }
-  #flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(46, 204, 113, 0.4); display: none; z-index: 9999; pointer-events: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>塾・出席受付システム</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <style>
+    :root { --primary: #005bac; --success: #28a745; --bg: #f4f7f9; }
+    body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
+    header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    h1 { margin: 0; font-size: 1.5rem; }
+
+    /* メインコンテナ */
+    .main-layout { display: flex; flex-direction: row; gap: 20px; padding: 20px; width: 95%; max-width: 1000px; flex-grow: 1; align-items: flex-start; }
+
+    /* カメラエリア */
+    .camera-section { flex: 2; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
+    #video-container { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 4/3; }
+    #video { width: 100%; height: 100%; object-fit: cover; }
+    
+    /* ステータス表示 */
+    #status-badge { margin-top: 15px; padding: 10px 20px; border-radius: 50px; font-weight: bold; font-size: 1.1rem; display: inline-block; transition: 0.3s; }
+    .waiting { background: #eee; color: #666; }
+    .processing { background: #fff3cd; color: #856404; }
+    .done { background: #d4edda; color: #155724; animation: pulse 0.5s ease-in-out; }
+
+    /* 履歴エリア */
+    .history-section { flex: 1; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); min-height: 300px; }
+    .history-title { font-weight: bold; border-bottom: 2px solid var(--bg); padding-bottom: 10px; margin-bottom: 10px; color: var(--primary); }
+    .history-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9rem; animation: slideIn 0.3s ease-out; }
+    .history-name { font-weight: bold; display: block; font-size: 1rem; }
+    .history-time { color: #999; font-size: 0.8rem; }
+
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 768px) { .main-layout { flex-direction: column; } .camera-section, .history-section { width: 100%; } }
+  </style>
 </head>
 <body>
 
-<div id="flash"></div>
-<h2>QR出席管理</h2>
-<video id="video" autoplay playsinline></video>
-<p id="message">カメラを起動してください</p>
-<button id="start">カメラ起動</button>
+  <header>
+    <h1>入館・出席受付</h1>
+  </header>
 
-<script>
-const backendUrl = "https://script.google.com/macros/s/AKfycbw7WHasovqd6KFDOuDSn2vbymS3N5eZNfK3w9DVkCIhVL6aIQ4dJ4FqsX1S9qvlyVldrw/exec"; 
-const video = document.getElementById('video');
-const message = document.getElementById('message');
-const startBtn = document.getElementById('start');
-const canvas = document.createElement('canvas');
-const context = canvas.getContext('2d');
+  <div class="main-layout">
+    <div class="camera-section">
+      <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+      </div>
+      <div id="status-badge" class="waiting">QRコードをかざしてください</div>
+    </div>
 
-let cooldown = false; 
-const cooldownTime = 3000;
+    <div class="history-section">
+      <div class="history-title">直近の受付記録</div>
+      <div id="history-list">
+        <div style="color:#ccc; text-align:center; margin-top:20px;">履歴はありません</div>
+      </div>
+    </div>
+  </div>
 
-// 音声再生の関数
-function playBeep() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
-  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.4);
-}
-
-// 画面フラッシュ
-function flashScreen() {
-  const flash = document.getElementById('flash');
-  flash.style.display = 'block';
-  setTimeout(() => flash.style.display = 'none', 300);
-}
-
-startBtn.addEventListener('click', () => {
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => { 
-      video.srcObject = stream; 
-      message.textContent = "QRをかざしてください";
-      startBtn.style.display = "none";
-      scan();
-    })
-    .catch(err => { message.textContent = "エラー: " + err; });
-});
-
-function scan() {
-  if(video.readyState === video.HAVE_ENOUGH_DATA && !cooldown) {
-    canvas.width = 400;
-    canvas.height = 300;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, canvas.width, canvas.height);
+  <script>
+    const backendUrl = "ここにGASのURLを貼り付け";
     
-    if(code) {
-      cooldown = true;
-      try {
-        const data = JSON.parse(code.data);
-        message.textContent = "送信中...";
-        
-        fetch(backendUrl, {
-          method: "POST",
-          mode: "no-cors",
-          body: JSON.stringify(data)
-        })
-        .then(() => {
-          playBeep(); // 音！
-          flashScreen(); // 光！
-          message.textContent = "✔ 記録完了！";
-          setTimeout(() => {
-            cooldown = false;
-            message.textContent = "次のQRを待機中...";
-          }, cooldownTime);
-        })
-        .catch(() => {
-          message.textContent = "送信に失敗しました";
-          cooldown = false;
-        });
-      } catch(e) {
-        message.textContent = "QRデータが正しくありません";
-        setTimeout(() => cooldown = false, 2000);
+    const video = document.getElementById('video');
+    const statusBadge = document.getElementById('status-badge');
+    const historyList = document.getElementById('history-list');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    let isProcessing = false;
+
+    // 音声通知（ブラウザの制限により、一度画面をタップしないと鳴らない場合があります）
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep() {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    // カメラ開始
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { statusBadge.textContent = "カメラ起動エラー: " + err; });
+
+    function scan() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const code = jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+
+        if (code) {
+          try {
+            const data = JSON.parse(code.data);
+            if (data.studentId && data.name) {
+              registerAttendance(data);
+            }
+          } catch (e) { /* JSON以外はスルー */ }
+        }
+      }
+      requestAnimationFrame(scan);
+    }
+
+    function registerAttendance(data) {
+      isProcessing = true;
+      playBeep();
+      statusBadge.textContent = "送信中...";
+      statusBadge.className = "processing";
+
+      fetch(backendUrl, {
+        method: "POST",
+        body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "ok") {
+          statusBadge.textContent = `✅ 受付完了：${data.name}さん`;
+          statusBadge.className = "done";
+          addHistory(data.name);
+        }
+      })
+      .catch(err => {
+        statusBadge.textContent = "❌ 送信エラー";
+        statusBadge.className = "waiting";
+      })
+      .finally(() => {
+        // 4秒後に次のスキャンを許可
+        setTimeout(() => {
+          isProcessing = false;
+          statusBadge.textContent = "QRコードをかざしてください";
+          statusBadge.className = "waiting";
+        }, 4000);
+      });
+    }
+
+    function addHistory(name) {
+      const now = new Date();
+      const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `<span class="history-name">${name}さん</span><span class="history-time">${timeStr} 受付</span>`;
+      
+      if (historyList.children[0] && historyList.children[0].style.color) {
+        historyList.innerHTML = ''; // 「履歴なし」を消去
+      }
+      historyList.insertBefore(item, historyList.firstChild);
+
+      // 表示は直近5件まで
+      if (historyList.children.length > 5) {
+        historyList.removeChild(historyList.lastChild);
       }
     }
-  }
-  requestAnimationFrame(scan);
-}
-</script>
+
+    requestAnimationFrame(scan);
+  </script>
 </body>
 </html>
