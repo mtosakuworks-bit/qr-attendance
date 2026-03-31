@@ -7,38 +7,31 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
   <style>
     :root {
-      --primary: #00469b; /* 塾をイメージしたネイビー */
-      --success: #28a745; /* 成功時の緑 */
-      --processing: #fff3cd; /* 送信中の黄 */
-      --error: #dc3545; /* エラー時の赤 */
-      --bg: #f8fbfd; /* 清潔感のある薄い水色の背景 */
+      --primary: #00469b;
+      --success: #28a745;
+      --processing: #fff3cd;
+      --error: #dc3545;
+      --bg: #f8fbfd;
     }
     body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
     
-    /* ヘッダー */
     header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
     h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.1rem; }
 
-    /* メインコンテナ（中央寄せ） */
     .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 50px; flex-grow: 1; }
 
-    /* カメラエリア：画面幅の7割に設定 */
     #video-container { position: relative; width: 70%; max-width: 700px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 40px; }
     #video { width: 100%; height: 100%; object-fit: cover; }
     
-    /* ガイド枠（中央にうっすら表示） */
     .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; border: 5px dashed rgba(255,255,255,0.6); border-radius: 25px; pointer-events: none; }
 
-    /* ステータスバッジ（カメラの下に配置、大きく見やすく） */
     #status-badge { width: 80%; max-width: 600px; padding: 25px 15px; border-radius: 15px; font-weight: bold; font-size: 1.6rem; text-align: center; transition: 0.3s; line-height: 1.4; border: 3px solid transparent; box-sizing: border-box; }
     
-    /* ステータス別のスタイル */
     .waiting { background: white; color: #555; border-color: #ddd; }
     .processing { background: var(--processing); color: #856404; border-color: #ffeeba; }
     .done { background: #d4edda; color: #155724; border-color: #c3e6cb; animation: bounce 0.5s; }
     .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
 
-    /* アニメーション */
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
   </style>
 </head>
@@ -58,7 +51,8 @@
   </div>
 
   <script>
-    const backendUrl = "https://script.google.com/macros/s/AKfycbzcvHExUaiZ7dIqzQVgw4M6i9PdISCb5F27CsX_UyrBzGWMpd82r44keUUc5UckyoY_zg/exec";
+    // --- 重要：ここに新しいGASのデプロイURLを貼る ---
+    const backendUrl = "https://script.google.com/macros/s/AKfycbybZqjZSBWS0niH9E8CmieTgx9G5lTnJALriA1QElenkgsnSG4PeGV896xvZOOz8hyUnw/exec";
     
     const video = document.getElementById('video');
     const statusBadge = document.getElementById('status-badge');
@@ -66,10 +60,9 @@
     const context = canvas.getContext('2d');
     let isProcessing = false;
 
-    // 音声通知（ブラウザ制限対策：最初のタップで有効化）
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep() {
-      if (audioCtx.state === 'suspended') audioCtx.resume(); // スリープ対策
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain); gain.connect(audioCtx.destination);
@@ -78,7 +71,6 @@
       osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     }
 
-    // カメラ開始
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => { video.srcObject = stream; })
       .catch(err => { statusBadge.textContent = "カメラエラー: " + err; statusBadge.className = "error"; });
@@ -104,24 +96,30 @@
 
     function registerAttendance(data) {
       isProcessing = true;
-      playBeep(); // 読み取り音
-      statusBadge.innerHTML = "送信中...<br>" + data.name + "さん";
+      playBeep();
+      statusBadge.innerHTML = "通信中...<br>" + data.name + "さん";
       statusBadge.className = "processing";
 
       fetch(backendUrl, { method: "POST", body: JSON.stringify(data) })
       .then(res => res.json())
       .then(res => {
         if (res.status === "ok") {
-          statusBadge.innerHTML = "✅ 受付完了<br>" + data.name + "さん、こんにちは！";
+          // GASから返ってきた type によってメッセージを切り替え
+          const typeLabel = res.type === "entry" ? "入室" : "退室";
+          const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
+          
+          statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${data.name}さん、${greeting}`;
           statusBadge.className = "done";
+        } else {
+          throw new Error(res.message);
         }
       })
-      .catch(() => {
-        statusBadge.innerHTML = "❌ 送信エラー<br>もう一度かざしてください";
+      .catch((err) => {
+        statusBadge.innerHTML = "❌ エラー<br>もう一度かざしてください";
         statusBadge.className = "error";
+        console.error(err);
       })
       .finally(() => {
-        // 次の読み取りまで4秒待機（二重登録防止）
         setTimeout(() => {
           isProcessing = false;
           statusBadge.innerHTML = "QRコードを<br>かざしてください";
@@ -131,7 +129,6 @@
     }
 
     requestAnimationFrame(scan);
-    // 最初のクリックでオーディオを有効化（重要）
     document.body.addEventListener('click', () => audioCtx.resume(), { once: true });
   </script>
 </body>
