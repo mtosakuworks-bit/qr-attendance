@@ -45,7 +45,8 @@
   </div>
 
   <script>
-    const backendUrl = "https://script.google.com/macros/s/AKfycbxUvHTi23gcESUvVMvVaWyhQe3nHSqpRfoKiq19rSCPwzKBwV2Eq1s12wAh08I72GkKUQ/exec";
+    // ★重要：GASで「新しいデプロイ」をした際の最新URLに差し替えてください
+    const backendUrl = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec";
 
     const video = document.getElementById('video');
     const statusBadge = document.getElementById('status-badge');
@@ -80,55 +81,57 @@
         const code = jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height);
 
         if (code) {
-          console.log("QR検出:", code.data);
-          try {
-            const data = JSON.parse(code.data);
-            console.log("parsed:", data);
-            if (data.studentId && data.name) {
-              registerAttendance(data);
-            } else {
-              throw new Error("QR内に studentId または name がありません");
-            }
-          } catch(e) {
-            console.error("QR解析エラー:", e, code.data);
-            statusBadge.innerHTML = "QR形式エラー";
-            statusBadge.className = "error";
+          // QRコードから取得した文字列（学籍番号）をそのまま送信データにする
+          const studentId = code.data.trim();
+          if (studentId) {
+            console.log("学籍番号を検出:", studentId);
+            registerAttendance(studentId);
           }
         }
       }
       requestAnimationFrame(scan);
     }
 
-    function registerAttendance(data) {
+    function registerAttendance(studentId) {
       isProcessing = true;
       playBeep();
-      statusBadge.innerHTML = "通信中...<br>" + data.name + "さん";
+      statusBadge.innerHTML = "照合中...<br>ID: " + studentId;
       statusBadge.className = "processing";
 
-      fetch(backendUrl, { method: "POST", body: JSON.stringify(data) })
-        .then(res => res.json())
-        .then(res => {
-          if (res.status === "ok") {
-            const typeLabel = res.type === "entry" ? "入室" : "退室";
-            const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
-            statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${data.name}さん、${greeting}`;
-            statusBadge.className = "done";
-          } else {
-            throw new Error(res.message);
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          statusBadge.innerHTML = "❌ エラー<br>もう一度かざしてください";
-          statusBadge.className = "error";
-        })
-        .finally(() => {
-          setTimeout(() => {
-            isProcessing = false;
-            statusBadge.innerHTML = "QRコードを<br>かざしてください";
-            statusBadge.className = "waiting";
-          }, 4000);
-        });
+      // GAS側に送るデータ形式を整える
+      const payload = {
+        studentId: studentId
+      };
+
+      fetch(backendUrl, { 
+        method: "POST", 
+        body: JSON.stringify(payload) 
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "ok") {
+          const typeLabel = res.type === "entry" ? "入室" : "退室";
+          const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
+          // GASから返ってきた名前(res.name)を表示
+          statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${res.name}さん、${greeting}`;
+          statusBadge.className = "done";
+        } else {
+          throw new Error(res.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        statusBadge.innerHTML = "❌ エラー<br>登録されていない番号です";
+        statusBadge.className = "error";
+      })
+      .finally(() => {
+        // 4秒後に待機状態に戻す
+        setTimeout(() => {
+          isProcessing = false;
+          statusBadge.innerHTML = "QRコードを<br>かざしてください";
+          statusBadge.className = "waiting";
+        }, 4000);
+      });
     }
 
     requestAnimationFrame(scan);
