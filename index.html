@@ -9,23 +9,33 @@
     :root {
       --primary: #00469b;
       --success: #28a745;
+      --warning: #ffc107;
       --processing: #fff3cd;
       --error: #dc3545;
       --bg: #f8fbfd;
     }
-    body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
+    body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
     header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
     h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.1rem; }
-    .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 50px; flex-grow: 1; }
-    #video-container { position: relative; width: 70%; max-width: 700px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 40px; }
+    
+    .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 40px; flex-grow: 1; }
+    
+    /* カメラエリア */
+    #video-container { position: relative; width: 85%; max-width: 600px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 30px; }
     #video { width: 100%; height: 100%; object-fit: cover; }
-    .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 250px; height: 250px; border: 5px dashed rgba(255,255,255,0.6); border-radius: 25px; pointer-events: none; }
-    #status-badge { width: 85%; max-width: 650px; padding: 25px 15px; border-radius: 15px; font-weight: bold; font-size: 1.8rem; text-align: center; transition: 0.3s; line-height: 1.4; border: 3px solid transparent; box-sizing: border-box; }
+    .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; border: 4px dashed rgba(255,255,255,0.6); border-radius: 20px; pointer-events: none; }
+    
+    /* ステータス表示エリア */
+    #status-badge { width: 90%; max-width: 650px; padding: 30px 15px; border-radius: 15px; font-weight: bold; font-size: 1.6rem; text-align: center; transition: 0.3s; line-height: 1.5; border: 4px solid transparent; box-sizing: border-box; }
+    
+    /* 各種状態のスタイル */
     .waiting { background: white; color: #555; border-color: #ddd; }
     .processing { background: var(--processing); color: #856404; border-color: #ffeeba; }
     .done { background: #d4edda; color: #155724; border-color: #c3e6cb; animation: bounce 0.5s; }
+    .late { background: #fff3cd; color: #856404; border-color: #ffda6a; animation: bounce 0.5s; }
     .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-    @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
   </style>
 </head>
 <body>
@@ -38,10 +48,11 @@
       <video id="video" autoplay playsinline></video>
       <div class="qr-guide"></div>
     </div>
-    <div id="status-badge" class="waiting">QRコードを<br>かざしてください</div>
+    <div id="status-badge" class="waiting">QRコードを<br>枠内にかざしてください</div>
   </div>
 
   <script>
+    // 【重要】デプロイしたGASのWebアプリURLに書き換えてください
     const backendUrl = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec";
 
     const video = document.getElementById('video');
@@ -50,24 +61,27 @@
     const ctx = canvas.getContext('2d');
     let isProcessing = false;
 
+    // 音声フィードバック用
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playBeep() {
+    function playBeep(freq = 880) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain); gain.connect(audioCtx.destination);
-      osc.type = 'sine'; osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.type = 'sine'; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
       gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
       osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     }
 
+    // カメラ起動
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => video.srcObject = stream)
       .catch(err => {
-        statusBadge.innerHTML = "カメラエラー:<br>" + err;
+        statusBadge.innerHTML = "カメラエラー:<br>許可設定を確認してください";
         statusBadge.className = "error";
       });
 
+    // スキャンループ
     function scan() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
         canvas.width = video.videoWidth;
@@ -77,17 +91,16 @@
 
         if (code) {
           const studentId = code.data.trim();
-          if (studentId) {
-            registerAttendance(studentId);
-          }
+          if (studentId) registerAttendance(studentId);
         }
       }
       requestAnimationFrame(scan);
     }
 
+    // GASへデータ送信
     function registerAttendance(studentId) {
       isProcessing = true;
-      playBeep();
+      playBeep(880); // 受付音
       statusBadge.innerHTML = "照合中...<br>ID: " + studentId;
       statusBadge.className = "processing";
 
@@ -98,28 +111,56 @@
       .then(res => res.json())
       .then(res => {
         if (res.status === "ok") {
-          const typeLabel = res.type === "entry" ? "入室" : "退室";
-          const greeting = res.type === "entry" ? "こんにちは！" : "お疲れ様でした！";
-          statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${res.name}さん、${greeting}`;
-          statusBadge.className = "done";
+          displayResult(res);
         } else {
           throw new Error(res.message);
         }
       })
       .catch(err => {
+        playBeep(440); // エラー音
         statusBadge.innerHTML = "❌ エラー<br>登録されていない番号です";
         statusBadge.className = "error";
       })
       .finally(() => {
+        // 4秒後に待機状態に戻す
         setTimeout(() => {
           isProcessing = false;
-          statusBadge.innerHTML = "QRコードを<br>かざしてください";
+          statusBadge.innerHTML = "QRコードを<br>枠内にかざしてください";
           statusBadge.className = "waiting";
         }, 4000);
       });
     }
 
+    // GASからのレスポンスに応じた画面表示
+    function displayResult(res) {
+      let typeLabel = "入室";
+      let greeting = "こんにちは！";
+      let className = "done";
+
+      switch(res.type) {
+        case "exit":
+          typeLabel = "退室";
+          greeting = "お疲れ様でした！";
+          break;
+        case "entry_late":
+        case "entry_after_alert":
+          typeLabel = "遅刻入室";
+          greeting = "次は間に合うように頑張ろう！";
+          className = "late";
+          break;
+        case "already_absent":
+          typeLabel = "欠席受理済み";
+          greeting = "今日は連絡を頂いています。";
+          className = "waiting";
+          break;
+      }
+
+      statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${res.name}さん、${greeting}`;
+      statusBadge.className = className;
+    }
+
     requestAnimationFrame(scan);
+    // iOS対策：ユーザーの初回クリックでAudioContextを有効化
     document.body.addEventListener('click', () => audioCtx.resume(), { once: true });
   </script>
 </body>
