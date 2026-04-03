@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>欠席・遅刻連絡</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
+    .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { color: #00469b; margin-top: 0; text-align: center; }
+    label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
+    select, textarea, button { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    button { background: #00469b; color: white; border: none; font-weight: bold; margin-top: 25px; cursor: pointer; }
+    button:disabled { background: #ccc; }
+    .status-msg { margin-top: 10px; font-size: 14px; text-align: center; color: #666; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>状況報告</h2>
+  <div id="loading-msg" class="status-msg">LINE連携を確認中...</div>
+
+  <label>報告内容</label>
+  <select id="status">
+    <option value="欠席">欠席します</option>
+    <option value="遅刻">遅刻します</option>
+  </select>
+
+  <label>理由・備考</label>
+  <textarea id="reason" rows="4" placeholder="（例）体調不良のため。15分ほど遅れます。"></textarea>
+
+  <button id="submit-btn" onclick="sendData()" disabled>報告を送信する</button>
+</div>
+
+<script>
+  const liffId = "あなたのLIFF ID"; // LINE Developersで発行されたID
+  const backendUrl = "あなたのGASウェブアプリURL";
+  let userLineId = "";
+
+  // 1. LIFFの初期化
+  liff.init({ liffId: liffId })
+    .then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login(); // ログインしていなければログイン画面へ
+      } else {
+        liff.getProfile().then(profile => {
+          userLineId = profile.userId; // LINE IDを取得
+          document.getElementById('loading-msg').innerText = "連携完了：報告を入力してください";
+          document.getElementById('submit-btn').disabled = false;
+        });
+      }
+    })
+    .catch((err) => {
+      document.getElementById('loading-msg').innerText = "エラー: LINE連携に失敗しました";
+    });
+
+  // 2. GASへデータを送信
+  function sendData() {
+    const status = document.getElementById('status').value;
+    const reason = document.getElementById('reason').value;
+
+    document.getElementById('submit-btn').innerText = "送信中...";
+    document.getElementById('submit-btn').disabled = true;
+
+    fetch(backendUrl, {
+      method: "POST",
+      body: JSON.stringify({
+        action: 'li_report',
+        lineId: userLineId, // 学籍番号の代わりにLINE IDを送る
+        status: status,
+        reason: reason
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if(data.status === "ok") {
+        alert("報告が完了しました。");
+        liff.closeWindow();
+      } else {
+        alert("エラー: " + data.message);
+      }
+    })
+    .catch(err => alert("通信エラーが発生しました"));
+  }
+</script>
+</body>
+</html>
