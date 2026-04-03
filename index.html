@@ -17,24 +17,16 @@
     body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; background: var(--bg); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; height: 100vh; color: #333; }
     header { background: var(--primary); color: white; width: 100%; padding: 15px 0; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
     h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.1rem; }
-    
     .container { display: flex; flex-direction: column; align-items: center; justify-content: start; width: 100%; max-width: 900px; padding-top: 40px; flex-grow: 1; }
-    
-    /* カメラエリア */
     #video-container { position: relative; width: 85%; max-width: 600px; border: 8px solid white; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); overflow: hidden; background: #000; aspect-ratio: 4/3; margin-bottom: 30px; }
     #video { width: 100%; height: 100%; object-fit: cover; }
     .qr-guide { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; border: 4px dashed rgba(255,255,255,0.6); border-radius: 20px; pointer-events: none; }
-    
-    /* ステータス表示エリア */
     #status-badge { width: 90%; max-width: 650px; padding: 30px 15px; border-radius: 15px; font-weight: bold; font-size: 1.6rem; text-align: center; transition: 0.3s; line-height: 1.5; border: 4px solid transparent; box-sizing: border-box; }
-    
-    /* 各種状態のスタイル */
     .waiting { background: white; color: #555; border-color: #ddd; }
     .processing { background: var(--processing); color: #856404; border-color: #ffeeba; }
     .done { background: #d4edda; color: #155724; border-color: #c3e6cb; animation: bounce 0.5s; }
     .late { background: #fff3cd; color: #856404; border-color: #ffda6a; animation: bounce 0.5s; }
     .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
-
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
   </style>
 </head>
@@ -52,8 +44,7 @@
   </div>
 
   <script>
-    // 【重要】デプロイしたGASのWebアプリURLに書き換えてください
-    const backendUrl = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec";
+    const backendUrl = "あなたのGASウェブアプリURLに書き換え";
 
     const video = document.getElementById('video');
     const statusBadge = document.getElementById('status-badge');
@@ -61,7 +52,6 @@
     const ctx = canvas.getContext('2d');
     let isProcessing = false;
 
-    // 音声フィードバック用
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playBeep(freq = 880) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -73,7 +63,6 @@
       osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     }
 
-    // カメラ起動
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => video.srcObject = stream)
       .catch(err => {
@@ -81,14 +70,12 @@
         statusBadge.className = "error";
       });
 
-    // スキャンループ
     function scan() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const code = jsQR(ctx.getImageData(0,0,canvas.width,canvas.height).data, canvas.width, canvas.height);
-
         if (code) {
           const studentId = code.data.trim();
           if (studentId) registerAttendance(studentId);
@@ -97,16 +84,18 @@
       requestAnimationFrame(scan);
     }
 
-    // GASへデータ送信
     function registerAttendance(studentId) {
       isProcessing = true;
-      playBeep(880); // 受付音
+      playBeep(880);
       statusBadge.innerHTML = "照合中...<br>ID: " + studentId;
       statusBadge.className = "processing";
 
       fetch(backendUrl, { 
         method: "POST", 
-        body: JSON.stringify({ studentId: studentId }) 
+        body: JSON.stringify({ 
+          action: 'qr_scan', // ここを追加しました
+          studentId: studentId 
+        }) 
       })
       .then(res => res.json())
       .then(res => {
@@ -117,12 +106,11 @@
         }
       })
       .catch(err => {
-        playBeep(440); // エラー音
+        playBeep(440);
         statusBadge.innerHTML = "❌ エラー<br>登録されていない番号です";
         statusBadge.className = "error";
       })
       .finally(() => {
-        // 4秒後に待機状態に戻す
         setTimeout(() => {
           isProcessing = false;
           statusBadge.innerHTML = "QRコードを<br>枠内にかざしてください";
@@ -131,36 +119,20 @@
       });
     }
 
-    // GASからのレスポンスに応じた画面表示
     function displayResult(res) {
       let typeLabel = "入室";
       let greeting = "こんにちは！";
       let className = "done";
-
       switch(res.type) {
-        case "exit":
-          typeLabel = "退室";
-          greeting = "お疲れ様でした！";
-          break;
-        case "entry_late":
-        case "entry_after_alert":
-          typeLabel = "遅刻入室";
-          greeting = "次は間に合うように頑張ろう！";
-          className = "late";
-          break;
-        case "already_absent":
-          typeLabel = "欠席受理済み";
-          greeting = "今日は連絡を頂いています。";
-          className = "waiting";
-          break;
+        case "exit": typeLabel = "退室"; greeting = "お疲れ様でした！"; break;
+        case "entry_after_alert": typeLabel = "遅刻入室"; greeting = "次は間に合うように頑張ろう！"; className = "late"; break;
+        case "already_absent": typeLabel = "欠席受理済み"; greeting = "連絡を頂いています。"; className = "waiting"; break;
       }
-
       statusBadge.innerHTML = `✅ ${typeLabel}完了<br>${res.name}さん、${greeting}`;
       statusBadge.className = className;
     }
 
     requestAnimationFrame(scan);
-    // iOS対策：ユーザーの初回クリックでAudioContextを有効化
     document.body.addEventListener('click', () => audioCtx.resume(), { once: true });
   </script>
 </body>
