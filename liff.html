@@ -25,6 +25,7 @@
     
     <div id="status-msg" class="status-badge">LINE連携を初期化中...</div>
 
+    <!-- 1. 新規連携エリア -->
     <div id="register-area" class="hidden">
       <p style="font-size: 0.9rem; color: #666;">初回のみ、名簿との連携登録が必要です。</p>
       <label>学籍番号</label>
@@ -34,6 +35,7 @@
       <button onclick="onRegister()" id="reg-btn">連携を完了する</button>
     </div>
 
+    <!-- 2. 報告エリア -->
     <div id="report-area" class="hidden">
       <h3 id="welcome-msg" style="font-size: 1.1rem; color: #333; border-left: 4px solid #00469b; padding-left: 10px;"></h3>
       <label>報告内容</label>
@@ -61,22 +63,15 @@
 
     async function main() {
       try {
-        console.log("LIFF Init Start...");
         await liff.init({ liffId: LIFF_ID });
-
         if (!liff.isLoggedIn()) {
           liff.login();
           return; 
         }
-
         const profile = await liff.getProfile();
         uid = profile.userId;
-        
-        if (!uid) throw new Error("UserIDの取得に失敗しました。LINE Developersの権限設定を確認してください。");
-        
         await checkUserStatus();
       } catch (err) {
-        console.error("Init Error:", err);
         document.getElementById('status-msg').innerHTML = `<span class="error-text">初期化エラー: ${err.message}</span>`;
       }
     }
@@ -88,7 +83,6 @@
           body: JSON.stringify({ action: "check_registration", lineId: uid })
         });
         const res = await response.json();
-        
         document.getElementById('status-msg').classList.add('hidden');
         if (res && res.status === "registered") {
           document.getElementById('welcome-msg').innerText = `${res.name} さんの連絡`;
@@ -97,32 +91,22 @@
           document.getElementById('register-area').classList.remove('hidden');
         }
       } catch (e) {
-        console.error("Status Check Error:", e);
-        document.getElementById('status-msg').innerHTML = `<span class="error-text">サーバー通信エラーが発生しました。</span>`;
+        document.getElementById('status-msg').innerHTML = `<span class="error-text">通信エラーが発生しました。</span>`;
       }
     }
 
-    /**
-     * 新規登録処理（修正版：undefined対策）
-     */
     async function onRegister() {
       const sid = document.getElementById('reg-sid').value.trim();
       const sname = document.getElementById('reg-name').value.trim();
-      
-      if (!sid || !sname) {
-        alert("学籍番号と氏名を両方入力してください。");
-        return;
-      }
+      if (!sid || !sname) { alert("学籍番号と氏名を入力してください。"); return; }
       
       const btn = document.getElementById('reg-btn');
-      if (btn.disabled) return;
       btn.disabled = true;
       btn.innerText = "照合中...";
 
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
-          redirect: "follow", // GASのリダイレクトを追跡
           body: JSON.stringify({ 
             action: "register", 
             lineId: uid, 
@@ -130,26 +114,17 @@
             studentName: sname 
           })
         });
-
-        // テキストとして一旦受け取り、空でないか確認（デバッグ用）
-        const text = await response.text();
-        console.log("Raw Response:", text);
-        
-        if (!text) throw new Error("サーバーからの返信が空です。GASの公開設定を確認してください。");
-        
-        const res = JSON.parse(text);
-        
+        const res = await response.json();
         if (res.status === "ok") {
-          alert(res.message || "連携が完了しました！"); 
-          setTimeout(() => { location.reload(); }, 500);
+          alert(res.message); 
+          location.reload();
         } else {
-          alert("【照合失敗】\n" + (res.message || "名簿に一致するデータがありません。")); 
+          alert("照合失敗：\n" + res.message); 
           btn.disabled = false;
           btn.innerText = "連携を完了する";
         }
       } catch (e) {
-        console.error("Register Error:", e);
-        alert("エラーが発生しました。\n内容: " + e.message);
+        alert("エラーが発生しました。再度お試しください。");
         btn.disabled = false;
         btn.innerText = "連携を完了する";
       }
@@ -159,15 +134,12 @@
       const st = document.getElementById('status-select').value;
       const rs = document.getElementById('reason').value.trim();
       const btn = document.getElementById('rep-btn');
-      
-      if (btn.disabled) return;
       btn.disabled = true;
       btn.innerText = "送信中...";
 
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
-          redirect: "follow",
           body: JSON.stringify({ 
             action: "li_report", 
             lineId: uid, 
@@ -175,18 +147,16 @@
             reason: rs 
           })
         });
-        
         const res = await response.json();
-        alert(res.message || "報告を送信しました。");
-        
         if (res.status === "ok") {
+          alert(res.message);
           liff.closeWindow();
         } else {
+          alert("送信失敗: " + res.message);
           btn.disabled = false;
           btn.innerText = "報告を送信する";
         }
       } catch (e) {
-        console.error("Report Error:", e);
         alert("通信に失敗しました。");
         btn.disabled = false;
         btn.innerText = "報告を送信する";
