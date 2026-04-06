@@ -50,7 +50,7 @@
   <script>
     // --- 【重要】ここを自分のIDとURLに書き換えてください ---
     const LIFF_ID = "2009685567-Xmto9X08"; 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec"; 
+    const GAS_URL = "https://script.google.com/macros/s/AKfycby2NPy3-erCoY1ykD5cR50bcP_FpF6oFkp_i0bJxLdZHSICd54uRaH7TiC10w4-tkh_/exec"; 
     // ---------------------------------------------------
 
     let uid = "";
@@ -61,17 +61,23 @@
 
     async function main() {
       try {
+        console.log("LIFF Init Start...");
         await liff.init({ liffId: LIFF_ID });
+
         if (!liff.isLoggedIn()) {
           liff.login();
           return; 
         }
+
         const profile = await liff.getProfile();
         uid = profile.userId;
-        if (!uid) throw new Error("UserID取得失敗");
+        
+        if (!uid) throw new Error("UserIDの取得に失敗しました。LINE Developersの権限設定を確認してください。");
+        
         await checkUserStatus();
       } catch (err) {
-        document.getElementById('status-msg').innerHTML = `<span class="error-text">エラー: ${err.message}</span>`;
+        console.error("Init Error:", err);
+        document.getElementById('status-msg').innerHTML = `<span class="error-text">初期化エラー: ${err.message}</span>`;
       }
     }
 
@@ -82,25 +88,31 @@
           body: JSON.stringify({ action: "check_registration", lineId: uid })
         });
         const res = await response.json();
+        
         document.getElementById('status-msg').classList.add('hidden');
-        if (res.status === "registered") {
+        if (res && res.status === "registered") {
           document.getElementById('welcome-msg').innerText = `${res.name} さんの連絡`;
           document.getElementById('report-area').classList.remove('hidden');
         } else {
           document.getElementById('register-area').classList.remove('hidden');
         }
       } catch (e) {
-        document.getElementById('status-msg').innerHTML = `<span class="error-text">サーバー通信エラー</span>`;
+        console.error("Status Check Error:", e);
+        document.getElementById('status-msg').innerHTML = `<span class="error-text">サーバー通信エラーが発生しました。</span>`;
       }
     }
 
     /**
-     * 新規登録処理（修正版）
+     * 新規登録処理（修正版：undefined対策）
      */
     async function onRegister() {
       const sid = document.getElementById('reg-sid').value.trim();
       const sname = document.getElementById('reg-name').value.trim();
-      if (!sid || !sname) return alert("全て入力してください");
+      
+      if (!sid || !sname) {
+        alert("学籍番号と氏名を両方入力してください。");
+        return;
+      }
       
       const btn = document.getElementById('reg-btn');
       if (btn.disabled) return;
@@ -110,7 +122,7 @@
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
-          redirect: "follow",
+          redirect: "follow", // GASのリダイレクトを追跡
           body: JSON.stringify({ 
             action: "register", 
             lineId: uid, 
@@ -118,17 +130,26 @@
             studentName: sname 
           })
         });
-        const res = await response.json();
+
+        // テキストとして一旦受け取り、空でないか確認（デバッグ用）
+        const text = await response.text();
+        console.log("Raw Response:", text);
+        
+        if (!text) throw new Error("サーバーからの返信が空です。GASの公開設定を確認してください。");
+        
+        const res = JSON.parse(text);
+        
         if (res.status === "ok") {
-          alert(res.message); 
+          alert(res.message || "連携が完了しました！"); 
           setTimeout(() => { location.reload(); }, 500);
         } else {
-          alert("【照合失敗】\n" + res.message); 
+          alert("【照合失敗】\n" + (res.message || "名簿に一致するデータがありません。")); 
           btn.disabled = false;
           btn.innerText = "連携を完了する";
         }
       } catch (e) {
-        alert("通信失敗。GASのURLと公開設定を確認してください。");
+        console.error("Register Error:", e);
+        alert("エラーが発生しました。\n内容: " + e.message);
         btn.disabled = false;
         btn.innerText = "連携を完了する";
       }
@@ -138,6 +159,7 @@
       const st = document.getElementById('status-select').value;
       const rs = document.getElementById('reason').value.trim();
       const btn = document.getElementById('rep-btn');
+      
       if (btn.disabled) return;
       btn.disabled = true;
       btn.innerText = "送信中...";
@@ -153,8 +175,10 @@
             reason: rs 
           })
         });
+        
         const res = await response.json();
-        alert(res.message);
+        alert(res.message || "報告を送信しました。");
+        
         if (res.status === "ok") {
           liff.closeWindow();
         } else {
@@ -162,7 +186,8 @@
           btn.innerText = "報告を送信する";
         }
       } catch (e) {
-        alert("通信失敗");
+        console.error("Report Error:", e);
+        alert("通信に失敗しました。");
         btn.disabled = false;
         btn.innerText = "報告を送信する";
       }
