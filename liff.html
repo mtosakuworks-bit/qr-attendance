@@ -48,48 +48,33 @@
   </div>
 
   <script>
+    // --- 【重要】ここを自分のIDとURLに書き換えてください ---
     const LIFF_ID = "2009685567-Xmto9X08"; 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec"; // 必ず /exec で終わるURLを貼る
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec"; 
+    // ---------------------------------------------------
+
     let uid = "";
 
-    // ページロード時に即座にメイン処理を開始
     window.onload = function() {
       main();
     };
 
-    /**
-     * 初期化メインフロー
-     * 1.init -> 2.Loginチェック -> 3.Profile取得 -> 4.登録確認
-     */
     async function main() {
       try {
-        console.log("LIFF Init Start...");
         await liff.init({ liffId: LIFF_ID });
-
         if (!liff.isLoggedIn()) {
-          console.log("Not Logged In. Redirecting...");
           liff.login();
           return; 
         }
-
         const profile = await liff.getProfile();
         uid = profile.userId;
-        console.log("Success! UserID:", uid);
-
-        if (!uid) throw new Error("ユーザーIDの取得に失敗しました。");
-
-        // GASへ現在の登録状況を問い合わせ
+        if (!uid) throw new Error("UserID取得失敗");
         await checkUserStatus();
-
       } catch (err) {
-        console.error("Initialization Error:", err);
-        document.getElementById('status-msg').innerHTML = `<span class="error-text">エラーが発生しました: ${err.message}</span>`;
+        document.getElementById('status-msg').innerHTML = `<span class="error-text">エラー: ${err.message}</span>`;
       }
     }
 
-    /**
-     * GASと通信して、名簿にLINE IDがあるか確認
-     */
     async function checkUserStatus() {
       try {
         const response = await fetch(GAS_URL, {
@@ -97,10 +82,7 @@
           body: JSON.stringify({ action: "check_registration", lineId: uid })
         });
         const res = await response.json();
-
-        // メッセージを消してエリアを表示
         document.getElementById('status-msg').classList.add('hidden');
-
         if (res.status === "registered") {
           document.getElementById('welcome-msg').innerText = `${res.name} さんの連絡`;
           document.getElementById('report-area').classList.remove('hidden');
@@ -108,30 +90,27 @@
           document.getElementById('register-area').classList.remove('hidden');
         }
       } catch (e) {
-        console.error("GAS Check Error:", e);
-        document.getElementById('status-msg').innerHTML = `<span class="error-text">サーバー通信エラーです。</span>`;
+        document.getElementById('status-msg').innerHTML = `<span class="error-text">サーバー通信エラー</span>`;
       }
     }
 
     /**
-     * 新規登録ボタン押下時
+     * 新規登録処理（修正版）
      */
     async function onRegister() {
       const sid = document.getElementById('reg-sid').value.trim();
       const sname = document.getElementById('reg-name').value.trim();
-      
-      if (!sid || !sname) {
-        alert("学籍番号と氏名を両方入力してください。");
-        return;
-      }
+      if (!sid || !sname) return alert("全て入力してください");
       
       const btn = document.getElementById('reg-btn');
+      if (btn.disabled) return;
       btn.disabled = true;
       btn.innerText = "照合中...";
 
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
+          redirect: "follow",
           body: JSON.stringify({ 
             action: "register", 
             lineId: uid, 
@@ -140,36 +119,33 @@
           })
         });
         const res = await response.json();
-        
         if (res.status === "ok") {
           alert(res.message); 
-          location.reload(); // 画面を更新して報告画面へ切り替え
+          setTimeout(() => { location.reload(); }, 500);
         } else {
           alert("【照合失敗】\n" + res.message); 
           btn.disabled = false;
           btn.innerText = "連携を完了する";
         }
       } catch (e) {
-        alert("通信に失敗しました。");
+        alert("通信失敗。GASのURLと公開設定を確認してください。");
         btn.disabled = false;
         btn.innerText = "連携を完了する";
       }
     }
 
-    /**
-     * 欠席・遅刻報告送信ボタン押下時
-     */
     async function onReport() {
       const st = document.getElementById('status-select').value;
       const rs = document.getElementById('reason').value.trim();
       const btn = document.getElementById('rep-btn');
-      
+      if (btn.disabled) return;
       btn.disabled = true;
       btn.innerText = "送信中...";
 
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
+          redirect: "follow",
           body: JSON.stringify({ 
             action: "li_report", 
             lineId: uid, 
@@ -178,16 +154,15 @@
           })
         });
         const res = await response.json();
-        
         alert(res.message);
         if (res.status === "ok") {
-          liff.closeWindow(); // 成功したらLIFFを閉じる
+          liff.closeWindow();
         } else {
           btn.disabled = false;
           btn.innerText = "報告を送信する";
         }
       } catch (e) {
-        alert("通信に失敗しました。");
+        alert("通信失敗");
         btn.disabled = false;
         btn.innerText = "報告を送信する";
       }
