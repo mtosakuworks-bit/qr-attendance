@@ -3,194 +3,110 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>【まつぼく塾】連絡システム</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
+  <title>まつぼく塾 連絡システム</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css">
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { background-color: #f0f4f8; padding: 20px; margin: 0; }
-    .container { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #00469b; margin-top: 0; margin-bottom: 20px; font-size: 1.4rem; }
-    .status-badge { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-size: 0.9rem; font-weight: bold; }
-    .loading { background: #e3f2fd; color: #0d47a1; }
-    .success { background: #e8f5e9; color: #2e7d32; }
-    .error { background: #ffebee; color: #c62828; }
+    body { background-color: #f0f4f8; padding: 20px; }
+    .container { max-width: 450px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #00469b; margin-bottom: 20px; }
+    .status-badge { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 6px; font-size: 0.9rem; background: #e3f2fd; color: #0d47a1; }
     .hidden { display: none; }
-    label { font-weight: bold; margin-top: 15px; display: block; color: #444; }
-    input, select, textarea { width: 100%; box-sizing: border-box; margin-top: 5px; }
-    button { width: 100%; font-weight: bold; margin-top: 25px; padding: 12px; cursor: pointer; border-radius: 8px; }
-    button:disabled { background: #ccc !important; cursor: not-allowed; }
-    .footer-note { font-size: 0.75rem; color: #888; text-align: center; margin-top: 20px; line-height: 1.4; }
+    button { width: 100%; font-weight: bold; margin-top: 20px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h2>まつぼく塾 連絡システム</h2>
+    <div id="status-msg" class="status-badge">LINE連携を確認中...</div>
 
-<div class="container">
-  <h2>まつぼく塾 連絡システム</h2>
-  <div id="status-msg" class="status-badge loading">LINE連携を確認中...</div>
+    <div id="register-area" class="hidden">
+      <p style="font-size: 0.9rem; color: #666;">初回のみ、名簿との連携登録が必要です。</p>
+      <label>学籍番号</label>
+      <input type="text" id="reg-sid" placeholder="例: 2026001">
+      <label>生徒氏名</label>
+      <input type="text" id="reg-name" placeholder="例: 山田 太郎">
+      <button onclick="onRegister()" id="reg-btn">連携を完了する</button>
+    </div>
 
-  <div id="register-area" class="hidden">
-    <p style="font-size: 0.9rem; color: #666; border-left: 4px solid #00469b; padding-left: 10px;">
-      初回のみ、塾の名簿データとLINEを紐付ける登録が必要です。
-    </p>
-    <label for="reg-sid">学籍番号</label>
-    <input type="text" id="reg-sid" placeholder="例: 2026001">
-    
-    <label for="reg-name">生徒氏名</label>
-    <input type="text" id="reg-name" placeholder="例: 山田 太郎">
-    
-    <button onclick="onRegister()" id="reg-btn">連携を完了する</button>
+    <div id="report-area" class="hidden">
+      <h3 id="welcome-msg" style="font-size: 1.1rem; color: #333;"></h3>
+      <label>報告内容</label>
+      <select id="status-select">
+        <option value="欠席">欠席します</option>
+        <option value="遅刻">遅刻します</option>
+      </select>
+      <label>理由・備考</label>
+      <textarea id="reason" rows="4" placeholder="例：体調不良のため。15分ほど遅れます。"></textarea>
+      <button onclick="onReport()" id="rep-btn">報告を送信する</button>
+    </div>
   </div>
 
-  <div id="report-area" class="hidden">
-    <h3 id="welcome-msg" style="font-size: 1.1rem; color: #333; margin-bottom: 10px;"></h3>
-    <p style="font-size: 0.85rem; color: #666;">本日の欠席・遅刻連絡を送信します。</p>
+  <script>
+    const LIFF_ID = "2009685407-HKqcuQON"; 
+    const GAS_URL = "★最新のGASデプロイURL★";
+    let uid = "";
 
-    <label for="status-select">報告内容</label>
-    <select id="status-select">
-      <option value="欠席">欠席します</option>
-      <option value="遅刻">遅刻します</option>
-    </select>
-
-    <label for="reason">理由・備考</label>
-    <textarea id="reason" rows="4" placeholder="（例）体調不良のため。/ 電車遅延のため15分ほど遅れます。"></textarea>
-
-    <button onclick="onReport()" id="rep-btn">報告を送信する</button>
-  </div>
-
-  <div class="footer-note">
-    ※一度登録すると変更できません。入力を間違えた場合や不具合は塾長までご連絡ください。
-  </div>
-</div>
-
-<script>
-  // ---------------------------------------------------------
-  // 設定：ご自身の環境に合わせて貼り替えてください
-  // ---------------------------------------------------------
-  const LIFF_ID = "2009685567-Xmto9X08"; 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyJ4DiIafWrJ_BeYMq9H1A5IYNIoCUi9MWFdeKKsCh3i9kRJ4dXQ-3HwU2Fnfmxf_0A/exec";
-  
-  let userLineId = "";
-
-  // 1. LIFFの初期化
-  liff.init({ liffId: LIFF_ID })
-    .then(() => {
-      if (!liff.isLoggedIn()) {
-        liff.login(); // 未ログインならログインへ
-      } else {
-        initializeApp();
-      }
-    })
-    .catch((err) => {
-      updateStatus("エラー: LINE連携に失敗しました", "error");
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      if (!liff.isLoggedIn()) { liff.login(); }
+      else { checkUser(); }
     });
 
-  // 2. 登録状況の自動チェック
-  async function initializeApp() {
-    try {
+    async function checkUser() {
       const profile = await liff.getProfile();
-      userLineId = profile.userId;
-
-      const response = await fetch(GAS_URL, {
+      uid = profile.userId;
+      const res = await fetch(GAS_URL, {
         method: "POST",
-        body: JSON.stringify({ action: "check_registration", lineId: userLineId })
-      });
-      const data = await response.json();
+        body: JSON.stringify({ action: "check_registration", lineId: uid })
+      }).then(r => r.json());
 
-      if (data.status === "registered") {
-        // 【登録済み】報告画面を表示
-        updateStatus("認証完了：報告を入力してください", "success");
-        document.getElementById('welcome-msg').innerText = data.name + " さんの連絡";
+      document.getElementById('status-msg').style.display = "none";
+      if (res.status === "registered") {
+        document.getElementById('welcome-msg').innerText = res.name + " さんの連絡";
         document.getElementById('report-area').classList.remove('hidden');
       } else {
-        // 【未登録】登録画面を表示
-        updateStatus("初回登録が必要です", "loading");
         document.getElementById('register-area').classList.remove('hidden');
       }
-    } catch (e) {
-      updateStatus("通信エラーが発生しました", "error");
-    }
-  }
-
-  // 3. 登録処理
-  async function onRegister() {
-    const sid = document.getElementById('reg-sid').value.trim();
-    const sname = document.getElementById('reg-name').value.trim();
-    if (!sid || !sname) {
-      alert("学籍番号と氏名を入力してください");
-      return;
     }
 
-    const btn = document.getElementById('reg-btn');
-    btn.disabled = true;
-    btn.innerText = "登録中...";
+    async function onRegister() {
+      const sid = document.getElementById('reg-sid').value.trim();
+      const sname = document.getElementById('reg-name').value.trim();
+      if(!sid || !sname) return alert("入力してください");
+      
+      const btn = document.getElementById('reg-btn');
+      btn.disabled = true; btn.innerText = "名簿照合中...";
 
-    try {
       const res = await fetch(GAS_URL, {
         method: "POST",
-        body: JSON.stringify({
-          action: "register",
-          lineId: userLineId,
-          studentId: sid,
-          studentName: sname
-        })
-      });
-      const data = await res.json();
-
-      if (data.status === "ok") {
-        alert("連携が完了しました！そのまま報告が可能です。");
-        location.reload(); // リロードして報告画面へ切り替え
+        body: JSON.stringify({ action: "register", lineId: uid, studentId: sid, studentName: sname })
+      }).then(r => r.json());
+      
+      if(res.status === "ok") {
+        alert(res.message);
+        location.reload(); 
       } else {
-        alert("エラー: " + data.message);
-        btn.disabled = false;
-        btn.innerText = "連携を完了する";
+        alert("【エラー】\n" + res.message);
+        btn.disabled = false; btn.innerText = "連携を完了する";
       }
-    } catch (e) {
-      alert("登録中に通信エラーが発生しました。");
-      btn.disabled = false;
     }
-  }
 
-  // 4. 報告送信処理
-  async function onReport() {
-    const status = document.getElementById('status-select').value;
-    const reason = document.getElementById('reason').value.trim();
-    
-    const btn = document.getElementById('rep-btn');
-    btn.disabled = true;
-    btn.innerText = "送信中...";
+    async function onReport() {
+      const st = document.getElementById('status-select').value;
+      const rs = document.getElementById('reason').value;
+      const btn = document.getElementById('rep-btn');
+      btn.disabled = true; btn.innerText = "送信中...";
 
-    try {
       const res = await fetch(GAS_URL, {
         method: "POST",
-        body: JSON.stringify({
-          action: "li_report",
-          lineId: userLineId,
-          status: status,
-          reason: reason
-        })
-      });
-      const data = await res.json();
-
-      if (data.status === "ok") {
-        alert("報告が完了しました。");
-        liff.closeWindow(); // 成功したら画面を閉じる
-      } else {
-        alert("エラー: " + data.message);
-        btn.disabled = false;
-        btn.innerText = "報告を送信する";
-      }
-    } catch (e) {
-      alert("送信中に通信エラーが発生しました。");
-      btn.disabled = false;
+        body: JSON.stringify({ action: "li_report", lineId: uid, status: st, reason: rs })
+      }).then(r => r.json());
+      
+      alert(res.message);
+      if(res.status === "ok") liff.closeWindow();
+      else { btn.disabled = false; btn.innerText = "報告を送信する"; }
     }
-  }
-
-  // ステータスメッセージ更新用
-  function updateStatus(text, type) {
-    const el = document.getElementById('status-msg');
-    el.innerText = text;
-    el.className = "status-badge " + type;
-  }
-</script>
+  </script>
 </body>
 </html>
