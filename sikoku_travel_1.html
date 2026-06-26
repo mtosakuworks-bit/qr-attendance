@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>四国 水と渓谷の旅プランナー</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{margin:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useMemo,useCallback}=React;
+
+const Ic=({size=16,children,style,...p})=>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style} {...p}>{children}</svg>;
+const Waves=p=><Ic {...p}><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></Ic>;
+const Mountain=p=><Ic {...p}><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></Ic>;
+const Utensils=p=><Ic {...p}><path d="M3 2v7c0 1.1.9 2 2 2s2-.9 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3z"/></Ic>;
+const Sparkles=p=><Ic {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></Ic>;
+const ClockIc=p=><Ic {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Ic>;
+const CarIc=p=><Ic {...p}><path d="M19 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h11l3 4v4a2 2 0 0 1-2 2z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></Ic>;
+const MapPin=p=><Ic {...p}><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></Ic>;
+const CheckIc=p=><Ic {...p}><polyline points="20 6 9 17 4 12"/></Ic>;
+const XIc=p=><Ic {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Ic>;
+const ChevUp=p=><Ic {...p}><polyline points="18 15 12 9 6 15"/></Ic>;
+const ChevDn=p=><Ic {...p}><polyline points="6 9 12 15 18 9"/></Ic>;
+const Reload=p=><Ic {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></Ic>;
+const Warn=p=><Ic {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Ic>;
+const StarIc=p=><Ic {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Ic>;
+const InfoIc=p=><Ic {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Ic>;
+
+const CATS={
+  "非日常":{bg:"#efe7fb",fg:"#6b46c1"},
+  "映え":{bg:"#fce4ee",fg:"#b83280"},
+  "自然":{bg:"#e3f1e6",fg:"#3f7a4d"},
+  "絶景":{bg:"#dcf2f4",fg:"#0b6e7d"},
+  "グルメ":{bg:"#fbead2",fg:"#b5660e"},
+  "町並み":{bg:"#f1e7da",fg:"#8a5a2b"},
+  "歴史":{bg:"#e7ecf2",fg:"#475569"},
+};
+const fmt=m=>`${Math.floor(m/60)}:${String(Math.round(m)%60).padStart(2,"0")}`;
+
+const PLANS={
+  niyodo:{
+    label:"仁淀川コース",from:"仁淀川（仁淀川町・中津渓谷あたり）",to:"道後温泉",
+    startMin:13*60+30,arriveByMin:18*60+30,minPerKm:1.33,destKm:90,
+    note:"国道33号を久万高原経由で松山へ抜ける絶景ルート。にこ淵・安居渓谷はアクティビティ周辺で先に寄るのがおすすめ。",
+    defaults:["niyodo_nakatsu","niyodo_sansan"],
+    spots:[
+      {id:"niyodo_niko",name:"にこ淵",area:"いの町",km:5,spur:30,visit:25,cats:["映え","自然"],cost:"無料",star:true,desc:"水神の大蛇が棲むと伝わる神秘の青い淵。「仁淀ブルー」の代表格。階段が急なので靴に注意。"},
+      {id:"niyodo_nakatsu",name:"中津渓谷",area:"仁淀川町",km:8,spur:15,visit:50,cats:["自然","映え"],cost:"無料",star:false,desc:"エメラルドの淵と滝が続く遊歩道。入口に日帰り温泉「ゆの森」。キャニオニング拠点にも。"},
+      {id:"niyodo_yasui",name:"安居渓谷",area:"仁淀川町",km:14,spur:45,visit:60,cats:["自然","絶景"],cost:"無料",star:false,desc:"「水晶淵」の透明度が圧巻。つり橋と背龍の滝。仁淀ブルーを最も深く味わえる奥地。"},
+      {id:"niyodo_mikawa",name:"道の駅みかわ",area:"久万高原町",km:44,spur:3,visit:25,cats:["グルメ"],cost:"〜千円",star:false,desc:"面河川と久万川が仁淀川になる清流沿い。美川そうめん・美川茶、対岸に高さ40mの軍艦岩。"},
+      {id:"niyodo_omogo",name:"面河渓",area:"久万高原町",km:58,spur:70,visit:60,cats:["自然","絶景"],cost:"無料",star:false,desc:"石鎚山南麓・仁淀川源流のエメラルド渓谷（国指定名勝）。大岩壁と清流、夏でもひんやり。"},
+      {id:"niyodo_sansan",name:"道の駅 天空の郷さんさん",area:"久万高原町",km:66,spur:3,visit:30,cats:["グルメ"],cost:"〜千円",star:false,desc:"標高800mの「天空の里」。高原野菜の直売とバイキング、パン工房。コンセプトは「うちの実家」。"},
+      {id:"niyodo_karst",name:"四国カルスト",area:"久万高原町",km:55,spur:190,visit:90,cats:["絶景","非日常"],cost:"無料",star:true,desc:"標高1400mの天空の草原と牛の放牧、石灰岩の奇景。往復の山道が長く半日仕事。今回の時間枠では厳しめ。"},
+    ],
+  },
+  shimanto:{
+    label:"四万十川コース",from:"四万十市中村（カヌー館・かわらっこあたり）",to:"道後温泉",
+    startMin:13*60+30,arriveByMin:18*60+30,minPerKm:1.0,destKm:150,
+    note:"国道56号・松山道で宇和島〜大洲〜内子を通って松山へ。距離があるぶん寄り道は厳選。鯛めし or 下灘で1か所が現実的。",
+    defaults:["shimanto_uwajima"],
+    spots:[
+      {id:"shimanto_sada",name:"佐田沈下橋",area:"四万十市",km:6,spur:20,visit:25,cats:["映え"],cost:"無料",star:true,desc:"四万十川最下流・全長291mの最長沈下橋。欄干のない橋から清流を間近に。SUP・カヌーの定番背景。"},
+      {id:"shimanto_kisaiya",name:"道の駅きさいや広場",area:"宇和島市",km:50,spur:6,visit:25,cats:["グルメ"],cost:"〜千円",star:false,desc:"宇和島の海の幸が集まる道の駅。名物「じゃこ天」の揚げたて、みかんジュース。軽めの食べ歩きに。"},
+      {id:"shimanto_uwajima",name:"宇和島鯛めし＆宇和島城",area:"宇和島市",km:53,spur:15,visit:70,cats:["グルメ","歴史"],cost:"千〜二千円",star:true,desc:"生卵だれに鯛の刺身を絡める「宇和島鯛めし」が名物。現存12天守の宇和島城も徒歩圏。昼食の主役に。"},
+      {id:"shimanto_ozu",name:"大洲・おはなはん通り",area:"大洲市",km:98,spur:8,visit:45,cats:["歴史","映え"],cost:"無料〜",star:false,desc:"「伊予の小京都」。木蝋で栄えた城下町の白壁と臥龍山荘、復元天守の大洲城。レトロ散策向き。"},
+      {id:"shimanto_uchiko",name:"内子の町並み",area:"内子町",km:110,spur:10,visit:50,cats:["町並み","歴史","映え"],cost:"無料〜",star:false,desc:"重要伝統的建造物群保存地区。約600mに商家が連なり、芝居小屋「内子座」も。木蝋と和紙の町。"},
+      {id:"shimanto_shimonada",name:"下灘駅",area:"伊予市",km:135,spur:45,visit:35,cats:["映え","絶景"],cost:"無料",star:true,desc:"ホームの先に伊予灘だけが広がる「日本一海に近い」無人駅。夕暮れは絶景。夕焼け小焼けライン経由。"},
+    ],
+  },
+  day2A:{
+    label:"Aルート：高知グルメ＋大歩危・祖谷（王道・最多スポット）",
+    from:"道後温泉",to:"高松",
+    startMin:9*60+30,arriveByMin:19*60,minPerKm:1.14,destKm:290,
+    note:"高知でタタキ→国道32号の吉野川渓谷を北上→大歩危・祖谷→脇町うだつ→高松うどん。候補が多いぶん入れすぎ注意。",
+    defaults:["d2a_hirome","d2a_kazura"],
+    spots:[
+      {id:"d2a_hirome",name:"ひろめ市場",area:"高知市",km:75,spur:20,visit:70,cats:["グルメ"],cost:"千〜二千円",star:true,desc:"高知の食の殿堂。藁焼き塩タタキ・清水サバ・屋台飯を大皿でシェア。昼飲みの聖地、5人旅向き。"},
+      {id:"d2a_katsura",name:"桂浜",area:"高知市",km:82,spur:45,visit:50,cats:["自然","絶景"],cost:"無料（駐車有料）",star:false,desc:"太平洋を望む弓形の砂浜と坂本龍馬像。荒波と松、龍王岬。市街から南へ少し寄り道。"},
+      {id:"d2a_ryuga",name:"龍河洞",area:"香美市",km:110,spur:45,visit:60,cats:["非日常","自然"],cost:"1200円前後",star:false,desc:"日本三大鍾乳洞のひとつ。1.75億年の造形と弥生土器が癒着した「神の壺」。冒険コースは穴場。"},
+      {id:"d2a_oboke",name:"大歩危峡 遊覧船",area:"三好市",km:170,spur:10,visit:45,cats:["自然","映え"],cost:"1500円前後",star:true,desc:"2億年が刻んだV字峡谷を約30分の舟下り。日本三大暴れ川・吉野川の流れと岩肌を真下から。"},
+      {id:"d2a_ekioboke",name:"道の駅大歩危（妖怪屋敷/ジビエ）",area:"三好市",km:172,spur:3,visit:40,cats:["グルメ","非日常"],cost:"〜千五百円",star:false,desc:"「怪遺産」の妖怪屋敷と石の博物館。三好産の猪鹿100%イノシカチーズバーガーが名物。"},
+      {id:"d2a_kazura",name:"祖谷のかずら橋",area:"三好市",km:185,spur:45,visit:50,cats:["非日常","映え"],cost:"550円",star:true,desc:"シラクチカズラで編んだ長さ45m・水面上14mの吊り橋。一歩ごとに軋み揺れる日本三大奇橋のスリル。"},
+      {id:"d2a_shonben",name:"祖谷の小便小僧",area:"三好市",km:192,spur:60,visit:20,cats:["映え"],cost:"無料",star:false,desc:"七曲りの断崖に立つ度胸試しの像。V字の祖谷渓を見下ろす絶景フォト。道幅狭く運転注意。"},
+      {id:"d2a_ueno",name:"レストハウスウエノ",area:"三好市池田",km:205,spur:5,visit:20,cats:["グルメ"],cost:"〜五百円",star:false,desc:"R32沿いの肉屋系食堂。揚げたて「絶品コロッケ」。サクサク＆肉感、ドライブの小腹に。"},
+      {id:"d2a_udatsu",name:"脇町うだつの町並み",area:"美馬市",km:235,spur:10,visit:50,cats:["町並み","グルメ"],cost:"無料〜",star:false,desc:"藍商で栄えた「うだつ」の上がる町家群。道の駅藍ランドの藍蔵カフェで阿波尾鶏や藍スイーツ。"},
+    ],
+  },
+  day2B:{
+    label:"Bルート：大歩危・祖谷をじっくり（高知市スキップ／秘境寄り）",
+    from:"道後温泉",to:"高松",
+    startMin:9*60+30,arriveByMin:19*60,minPerKm:1.16,destKm:250,
+    note:"高知市には寄らず大豊から一気に渓谷へ。浮いた時間で祖谷の奥（落合集落・奥かずら橋）まで攻める秘境ルート。",
+    defaults:["d2b_oboke","d2b_kazura","d2b_ochiai"],
+    spots:[
+      {id:"d2b_oboke",name:"大歩危峡 遊覧船",area:"三好市",km:150,spur:10,visit:45,cats:["自然","映え"],cost:"1500円前後",star:true,desc:"2億年が刻んだV字峡谷を約30分の舟下り。岩肌を真下から見上げる迫力。"},
+      {id:"d2b_ekioboke",name:"道の駅大歩危（妖怪屋敷/ジビエ）",area:"三好市",km:152,spur:3,visit:40,cats:["グルメ","非日常"],cost:"〜千五百円",star:false,desc:"妖怪屋敷と石の博物館、イノシカチーズバーガー。休憩＆ネタ枠。"},
+      {id:"d2b_kazura",name:"祖谷のかずら橋",area:"三好市",km:165,spur:45,visit:50,cats:["非日常","映え"],cost:"550円",star:true,desc:"長さ45m・水面上14m、軋み揺れる日本三大奇橋。祖谷のハイライト。"},
+      {id:"d2b_shonben",name:"祖谷の小便小僧",area:"三好市",km:172,spur:55,visit:20,cats:["映え"],cost:"無料",star:false,desc:"断崖の度胸試し像とV字渓谷の絶景フォト。"},
+      {id:"d2b_ochiai",name:"落合集落（東祖谷）",area:"三好市",km:178,spur:40,visit:30,cats:["自然","絶景"],cost:"無料",star:false,desc:"斜面に高低差390mで広がる石垣と民家の山村集落（重伝建）。対岸展望所からの眺めが絶景の穴場。"},
+      {id:"d2b_okukazura",name:"奥祖谷二重かずら橋",area:"三好市",km:188,spur:95,visit:40,cats:["非日常","絶景"],cost:"550円",star:false,desc:"観光地化されない奥地に「男橋・女橋」2本。人力ロープのゴンドラ「野猿」も。秘境度MAX。"},
+      {id:"d2b_ueno",name:"レストハウスウエノ",area:"三好市池田",km:190,spur:5,visit:20,cats:["グルメ"],cost:"〜五百円",star:false,desc:"R32沿い、揚げたて絶品コロッケ。"},
+      {id:"d2b_udatsu",name:"脇町うだつの町並み",area:"美馬市",km:215,spur:10,visit:50,cats:["町並み","グルメ"],cost:"無料〜",star:false,desc:"藍商の町家群と藍蔵カフェ、阿波尾鶏。"},
+    ],
+  },
+};
+
+function computeTimeline(plan,order,visitOf){
+  const byId=Object.fromEntries(plan.spots.map(s=>[s.id,s]));
+  let t=plan.startMin,prevKm=0,drive=0,spur=0,visit=0,back=0;
+  const legs=[];
+  for(const id of order){
+    const s=byId[id];if(!s)continue;
+    const seg=Math.abs(s.km-prevKm)*plan.minPerKm;
+    if(s.km<prevKm)back+=prevKm-s.km;
+    const v=visitOf(s),arrive=t+seg+s.spur,depart=arrive+v;
+    drive+=seg;spur+=s.spur;visit+=v;
+    legs.push({s,arrive,depart,visit:v,drive:seg,backtrack:s.km<prevKm});
+    t=depart;prevKm=s.km;
+  }
+  const tail=Math.abs(plan.destKm-prevKm)*plan.minPerKm;
+  const endTime=t+tail;
+  return{legs,endTime,drive:drive+tail,spur,visit,back,
+    total:endTime-plan.startMin,
+    feasible:endTime<=plan.arriveByMin+0.5,
+    overflow:Math.max(0,endTime-plan.arriveByMin)};
+}
+function sortedInsert(plan,order,id){
+  const km=x=>plan.spots.find(s=>s.id===x).km;
+  return [...order,id].sort((a,b)=>km(a)-km(b));
+}
+
+function Tag({name}){
+  const c=CATS[name]||{bg:"#eee",fg:"#555"};
+  return <span style={{background:c.bg,color:c.fg,display:"inline-flex",alignItems:"center",
+    borderRadius:9999,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{name}</span>;
+}
+
+function Gauge({tl,plan}){
+  const span=plan.arriveByMin-plan.startMin;
+  const pct=Math.min(100,(tl.total/span)*100);
+  const over=!tl.feasible;
+  return(
+    <div style={{marginTop:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,fontWeight:600,color:"#5b6b7c",marginBottom:4}}>
+        <span>{fmt(plan.startMin)} 出発</span>
+        <span>{plan.to} {fmt(plan.arriveByMin)} 着まで</span>
+      </div>
+      <div style={{height:12,borderRadius:9999,overflow:"hidden",background:"#e7e1d5"}}>
+        <div style={{height:"100%",borderRadius:9999,transition:"width .3s",width:pct+"%",
+          background:over?"#e2624a":"linear-gradient(90deg,#1ca3b8,#0b6e7d)"}}/>
+      </div>
+      <div style={{marginTop:6,fontSize:12,fontWeight:700,color:over?"#c0392b":"#0b6e7d"}}>
+        {over
+          ? `${fmt(tl.endTime)} 着見込み — ${Math.round(tl.overflow)}分オーバー。どれか外そう`
+          : `${fmt(tl.endTime)} 着見込み — 余裕 ${Math.round(plan.arriveByMin-tl.endTime)}分`}
+      </div>
+    </div>
+  );
+}
+
+function Planner({planId}){
+  const plan=PLANS[planId];
+  const [order,setOrder]=useState(plan.defaults);
+  const [ov,setOv]=useState({});
+  const visitOf=useCallback(s=>ov[s.id]!=null?ov[s.id]:s.visit,[ov]);
+  const tl=useMemo(()=>computeTimeline(plan,order,visitOf),[plan,order,visitOf]);
+  const inOrder=id=>order.includes(id);
+  const adjVisit=(id,d)=>setOv(p=>{const cur=p[id]!=null?p[id]:plan.spots.find(s=>s.id===id).visit;return{...p,[id]:Math.max(10,cur+d)};});
+  const toggle=id=>setOrder(o=>o.includes(id)?o.filter(x=>x!==id):sortedInsert(plan,o,id));
+  const move=(id,dir)=>setOrder(o=>{const i=o.indexOf(id),j=i+dir;if(i<0||j<0||j>=o.length)return o;const n=[...o];[n[i],n[j]]=[n[j],n[i]];return n;});
+  const reset=()=>{setOrder(plan.defaults);setOv({});};
+  const addInfo=id=>{if(inOrder(id))return{ok:true};const r=computeTimeline(plan,sortedInsert(plan,order,id),visitOf);return{ok:r.feasible,overflow:r.overflow};};
+  const master=[...plan.spots].sort((a,b)=>a.km-b.km);
+  const S=(v)=>({style:v});
+  return(
+    <div>
+      <div style={{borderRadius:16,padding:16,marginBottom:16,background:"#fffdf8",border:"1px solid #e7e1d5"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",fontSize:13,fontWeight:700,color:"#0d1b2a"}}>
+          <MapPin size={14} style={{color:"#1ca3b8",flexShrink:0}}/>{plan.from}
+          <span style={{color:"#9aa6b2"}}>→</span>{plan.to}
+        </div>
+        <p style={{fontSize:11,marginTop:6,lineHeight:1.6,color:"#5b6b7c"}}>{plan.note}</p>
+        <Gauge tl={tl} plan={plan}/>
+        <div style={{display:"flex",flexWrap:"wrap",gap:"6px 14px",marginTop:10,fontSize:11,color:"#5b6b7c"}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><CarIc size={12}/>移動 約{Math.round(tl.drive)}分</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><ClockIc size={12}/>滞在 約{Math.round(tl.visit)}分</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><MapPin size={12}/>{order.length}か所</span>
+          {tl.back>15&&<span style={{display:"inline-flex",alignItems:"center",gap:3,fontWeight:700,color:"#c0392b"}}><Warn size={12}/>逆走 約{Math.round(tl.back)}km</span>}
+          <button onClick={reset} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:3,fontWeight:600,color:"#1ca3b8",background:"none",border:"none",cursor:"pointer",fontSize:11}}>
+            <Reload size={12}/>リセット</button>
+        </div>
+      </div>
+
+      {order.length>0&&(
+        <div style={{borderRadius:16,padding:16,marginBottom:16,background:"#0d1b2a"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.12em",color:"#7fd3df",marginBottom:10}}>当日の流れ</div>
+          <ol style={{listStyle:"none",padding:0,margin:"0 0 0 4px",borderLeft:"2px solid #1f3a4d",position:"relative"}}>
+            <li style={{position:"relative",paddingLeft:14,paddingBottom:10}}>
+              <span style={{position:"absolute",left:-6,top:3,width:10,height:10,borderRadius:9999,background:"#7fd3df",display:"block"}}/>
+              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{fmt(plan.startMin)} 出発</div>
+              <div style={{fontSize:11,color:"#8aa0ad"}}>{plan.from}</div>
+            </li>
+            {tl.legs.map(lg=>(
+              <li key={lg.s.id} style={{position:"relative",paddingLeft:14,paddingBottom:10}}>
+                <span style={{position:"absolute",left:-6,top:3,width:10,height:10,borderRadius:9999,background:lg.backtrack?"#e2624a":"#e6a23c",display:"block"}}/>
+                <div style={{fontSize:12,fontWeight:700,color:"#fff",display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                  {fmt(lg.arrive)}–{fmt(lg.depart)} {lg.s.name}
+                  {lg.s.star&&<StarIc size={11} fill="#e6a23c" style={{color:"#e6a23c"}}/>}
+                </div>
+                <div style={{fontSize:11,color:"#8aa0ad"}}>滞在{Math.round(lg.visit)}分 ・ 移動{Math.round(lg.drive+lg.s.spur)}分{lg.backtrack?" ・ 逆走あり":""}</div>
+              </li>
+            ))}
+            <li style={{position:"relative",paddingLeft:14}}>
+              <span style={{position:"absolute",left:-6,top:3,width:10,height:10,borderRadius:9999,background:tl.feasible?"#7fd3df":"#e2624a",display:"block"}}/>
+              <div style={{fontSize:12,fontWeight:700,color:tl.feasible?"#fff":"#ffb4a6",display:"flex",alignItems:"center",gap:5}}>
+                {fmt(tl.endTime)} {plan.to} 着
+                {!tl.feasible&&<span style={{fontSize:11}}>（{Math.round(tl.overflow)}分遅れ）</span>}
+              </div>
+            </li>
+          </ol>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {master.map(s=>{
+          const on=inOrder(s.id),ai=addInfo(s.id),pos=order.indexOf(s.id);
+          return(
+            <div key={s.id} style={{borderRadius:16,padding:14,background:on?"#fffdf8":"#faf7f0",
+              border:on?"1.5px solid #1ca3b8":"1px solid #e7e1d5",opacity:!on&&!ai.ok?0.52:1}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+                    <span style={{fontSize:14,fontWeight:700,color:"#0d1b2a"}}>{s.name}</span>
+                    {s.star&&<StarIc size={12} fill="#e6a23c" style={{color:"#e6a23c"}}/>}
+                    <span style={{fontSize:11,color:"#9aa6b2"}}>{s.area}</span>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:3,marginTop:5}}>
+                    {s.cats.map(c=><Tag key={c} name={c}/>)}
+                    <span style={{fontSize:11,fontWeight:600,padding:"0 5px",color:"#b5660e"}}>{s.cost}</span>
+                  </div>
+                  <p style={{fontSize:12,marginTop:5,lineHeight:1.6,color:"#5b6b7c"}}>{s.desc}</p>
+                </div>
+                <button onClick={()=>(on||ai.ok)&&toggle(s.id)} disabled={!on&&!ai.ok}
+                  style={{flexShrink:0,width:36,height:36,borderRadius:9999,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:on?"#1ca3b8":ai.ok?"#fff":"#f0ebe0",
+                    border:on?"none":"1.5px solid "+(ai.ok?"#1ca3b8":"#d9d2c4"),
+                    color:on?"#fff":ai.ok?"#1ca3b8":"#bbb",cursor:!on&&!ai.ok?"not-allowed":"pointer"}}>
+                  {on?<CheckIc size={18}/>:ai.ok?<span style={{fontSize:22,lineHeight:1,marginTop:-2}}>+</span>:<XIc size={16}/>}
+                </button>
+              </div>
+              {on&&(
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px dashed #e7e1d5",flexWrap:"wrap"}}>
+                  <span style={{fontSize:11,fontWeight:600,color:"#5b6b7c"}}>滞在</span>
+                  <div style={{display:"flex",alignItems:"center",gap:3}}>
+                    <button onClick={()=>adjVisit(s.id,-5)} style={{width:28,height:28,borderRadius:8,fontWeight:700,fontSize:16,background:"#f0ebe0",color:"#5b6b7c",border:"none",cursor:"pointer"}}>-</button>
+                    <span style={{fontSize:13,fontWeight:700,width:44,textAlign:"center",color:"#0d1b2a"}}>{Math.round(visitOf(s))}分</span>
+                    <button onClick={()=>adjVisit(s.id,+5)} style={{width:28,height:28,borderRadius:8,fontWeight:700,fontSize:16,background:"#f0ebe0",color:"#5b6b7c",border:"none",cursor:"pointer"}}>+</button>
+                  </div>
+                  <div style={{marginLeft:"auto",display:"flex",gap:3}}>
+                    <button onClick={()=>move(s.id,-1)} disabled={pos<=0}
+                      style={{width:28,height:28,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",background:"#f0ebe0",border:"none",cursor:pos<=0?"not-allowed":"pointer",color:pos<=0?"#ccc":"#5b6b7c"}}>
+                      <ChevUp size={15}/>
+                    </button>
+                    <button onClick={()=>move(s.id,+1)} disabled={pos>=order.length-1}
+                      style={{width:28,height:28,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",background:"#f0ebe0",border:"none",cursor:pos>=order.length-1?"not-allowed":"pointer",color:pos>=order.length-1?"#ccc":"#5b6b7c"}}>
+                      <ChevDn size={15}/>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!on&&!ai.ok&&(
+                <div style={{fontSize:11,fontWeight:600,marginTop:6,display:"flex",alignItems:"center",gap:3,color:"#c0392b"}}>
+                  <Warn size={12}/>これを足すと約{Math.round(ai.overflow)}分オーバー（先にどれか外して）
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const ACTS={
+  niyodo:{
+    title:"仁淀川（によどがわ）",
+    blurb:"水質日本一の「仁淀ブルー」。流れは穏やかで、透明度と青の絶景が主役。映え・非日常重視の5人旅に刺さる。",
+    items:[
+      {n:"SUP（イチオシの1点豪華）",d:"鏡のような青い水面を立って漕ぐ。写真/動画データ付きプランが多く「映え」に最適。"},
+      {n:"中津渓谷キャニオニング",d:"渓谷の奥でロープ下降・滝つぼダイブ・天然スライダー。仁淀ブルーの中を全身で攻める非日常。"},
+      {n:"カヌー／カヤック",d:"五色石が透ける川底を眺めながらの水上散歩。クリスタルカヤックなら浮遊感が異次元。初心者向き。"},
+      {n:"ラフティング",d:"6人乗りモンスターSUPでワイワイ系。叫ぶより笑う川。"},
+    ],
+    one:"5人旅の1点豪華はSUPか中津渓谷キャニオニング。青の映え＆非日常をまとめて回収できる。",
+  },
+  shimanto:{
+    title:"四万十川（しまんとがわ）",
+    blurb:"「日本最後の清流」。雄大でのんびり、沈下橋の風景が象徴。ゆったり×ノスタルジー寄り。",
+    items:[
+      {n:"SUP（沈下橋くぐり）",d:"広く穏やかな川面を進み、沈下橋の下をSUPでくぐる記念撮影が定番。泳げなくてもOK。"},
+      {n:"カヌー（川の駅カヌー館 ほか）",d:"四万十観光の王道。清流を自分のペースで下る。レンタサイクルやキャンプと合わせやすい。"},
+      {n:"屋形船／遊覧船",d:"船頭ガイド付きで沈下橋の下を1時間ほど。鮎の塩焼きを船上で。"},
+      {n:"ラフティング（中流・十和〜大正）",d:"岩場が増える中流域はやや刺激的。ジップライン登場の話題スポットも。"},
+    ],
+    one:"1点豪華はSUPで沈下橋くぐり。穏やかなので5人全員で確実に成功させやすい。",
+  },
+};
+
+function ActCard({k,selected,onSelect}){
+  const a=ACTS[k];
+  return(
+    <div style={{borderRadius:16,padding:16,marginBottom:12,background:"#fffdf8",border:selected?"2px solid #1ca3b8":"1px solid #e7e1d5"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <Waves size={17} style={{color:"#1ca3b8"}}/>
+          <span style={{fontSize:15,fontWeight:900,color:"#0d1b2a"}}>{a.title}</span>
+        </div>
+        <button onClick={()=>onSelect(k)} style={{fontSize:12,fontWeight:700,padding:"6px 12px",borderRadius:9999,
+          background:selected?"#1ca3b8":"#eef7f8",color:selected?"#fff":"#0b6e7d",border:"none",cursor:"pointer"}}>
+          {selected?"選択中 ✓":"メインに選ぶ"}
+        </button>
+      </div>
+      <p style={{fontSize:12,lineHeight:1.6,color:"#5b6b7c",marginBottom:10}}>{a.blurb}</p>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {a.items.map(it=>(
+          <div key={it.n}>
+            <div style={{fontSize:13,fontWeight:700,color:"#0d1b2a"}}>{it.n}</div>
+            <div style={{fontSize:12,lineHeight:1.6,color:"#5b6b7c"}}>{it.d}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{marginTop:10,borderRadius:12,padding:"8px 10px",fontSize:12,fontWeight:600,
+        display:"flex",alignItems:"flex-start",gap:5,background:"#fbf3e2",color:"#b5660e"}}>
+        <Sparkles size={13} style={{flexShrink:0,marginTop:1}}/>{a.one}
+      </div>
+    </div>
+  );
+}
+
+function SegBtn({opts,val,onChange}){
+  return(
+    <div style={{display:"flex",gap:5,padding:4,borderRadius:14,background:"#e7e1d5",marginBottom:14}}>
+      {opts.map(o=>(
+        <button key={o.id} onClick={()=>onChange(o.id)}
+          style={{flex:1,padding:"7px 4px",borderRadius:10,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",
+            background:val===o.id?"#fffdf8":"transparent",color:val===o.id?"#0b6e7d":"#8a8270",
+            boxShadow:val===o.id?"0 1px 3px rgba(0,0,0,.08)":"none"}}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SecH({icon,title,sub}){
+  return(
+    <div style={{marginBottom:12,marginTop:4}}>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{color:"#1ca3b8"}}>{icon}</span>
+        <span style={{fontSize:16,fontWeight:900,color:"#0d1b2a"}}>{title}</span>
+      </div>
+      {sub&&<p style={{fontSize:12,marginTop:3,lineHeight:1.6,color:"#5b6b7c"}}>{sub}</p>}
+    </div>
+  );
+}
+
+function App(){
+  const [tab,setTab]=useState("act");
+  const [river,setRiver]=useState("niyodo");
+  const [route,setRoute]=useState("day2A");
+  const tabs=[{id:"act",label:"1日目 遊び"},{id:"d1",label:"1日目 帰り道"},{id:"d2",label:"2日目 ルート"}];
+  return(
+    <div style={{background:"#f3efe6",minHeight:"100vh",fontFamily:"'Zen Kaku Gothic New',system-ui,sans-serif"}}>
+      <header style={{padding:"22px 16px 18px",background:"linear-gradient(160deg,#0d1b2a,#0b3a44)"}}>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.3em",color:"#7fd3df",marginBottom:4}}>SHIKOKU ・ 男5人旅</div>
+        <h1 style={{fontSize:22,fontWeight:900,lineHeight:1.3,color:"#fff",margin:"0 0 6px"}}>水と渓谷の旅<br/>プランナー</h1>
+        <p style={{fontSize:11,lineHeight:1.7,color:"#9fb6c0",margin:"0 0 8px"}}>川あそび → 道後温泉泊 → 高知・徳島の渓谷を抜けて高松へ。<br/>スポットを選ぶと移動・滞在を試算。間に合わない候補は選べません。</p>
+        <div style={{display:"flex",flexWrap:"wrap",gap:10,fontSize:11,fontWeight:600,color:"#cfe6ea"}}>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><Sparkles size={11}/>非日常・映え</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><Mountain size={11}/>自然・絶景</span>
+          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><Utensils size={11}/>グルメ（コスパ重視）</span>
+        </div>
+      </header>
+
+      <div style={{position:"sticky",top:0,zIndex:10,padding:"8px 10px",background:"rgba(243,239,230,0.92)",backdropFilter:"blur(8px)"}}>
+        <div style={{display:"flex",gap:5,padding:4,borderRadius:14,background:"#e7e1d5"}}>
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{flex:1,padding:"7px 3px",borderRadius:10,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",
+                background:tab===t.id?"#fffdf8":"transparent",color:tab===t.id?"#0b6e7d":"#8a8270",
+                boxShadow:tab===t.id?"0 1px 3px rgba(0,0,0,.08)":"none"}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <main style={{padding:"8px 12px 60px",maxWidth:600,margin:"0 auto"}}>
+        {tab==="act"&&<>
+          <SecH icon={<Waves size={14}/>} title="メインの川あそびを選ぶ" sub="どっちをメイン拠点にする？ 選ぶと「帰り道」タブのルートが切り替わる。"/>
+          <ActCard k="niyodo" selected={river==="niyodo"} onSelect={setRiver}/>
+          <ActCard k="shimanto" selected={river==="shimanto"} onSelect={setRiver}/>
+          <div style={{borderRadius:14,padding:12,fontSize:11,lineHeight:1.7,display:"flex",alignItems:"flex-start",gap:5,background:"#eef7f8",color:"#0b6e7d"}}>
+            <InfoIc size={13} style={{flexShrink:0,marginTop:1}}/>
+            本格ラフティングの「本場」は2日目に通る吉野川（大歩危・小歩危）。激流系をやりたいなら1日目は仁淀川で映え、2日目に大歩危ラフトという分担も手。ただし大歩危ラフトは半日かかるので2日目は時間が厳しめ。
+          </div>
+        </>}
+        {tab==="d1"&&<>
+          <SecH icon={<CarIc size={14}/>} title="1日目・帰り道プランナー" sub="13:30に川あそび終了 → 18:30までに道後温泉。寄り道を選んで組み替えよう。"/>
+          <SegBtn opts={[{id:"niyodo",label:PLANS.niyodo.label},{id:"shimanto",label:PLANS.shimanto.label}]} val={river} onChange={setRiver}/>
+          <Planner key={river} planId={river}/>
+        </>}
+        {tab==="d2"&&<>
+          <SecH icon={<Mountain size={14}/>} title="2日目・ルートプランナー" sub="9:30に道後出発 → 19:00までに高松。まずルートを選び、スポットを組み替えよう。"/>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+            {["day2A","day2B"].map(r=>(
+              <button key={r} onClick={()=>setRoute(r)}
+                style={{display:"flex",alignItems:"center",gap:8,padding:12,borderRadius:14,textAlign:"left",cursor:"pointer",
+                  background:route===r?"#fffdf8":"#faf7f0",border:route===r?"2px solid #1ca3b8":"1px solid #e7e1d5"}}>
+                <span style={{width:20,height:20,borderRadius:9999,display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:11,fontWeight:900,flexShrink:0,
+                  background:route===r?"#1ca3b8":"#e7e1d5",color:route===r?"#fff":"#8a8270"}}>
+                  {r==="day2A"?"A":"B"}
+                </span>
+                <span style={{fontSize:13,fontWeight:700,color:"#0d1b2a"}}>{PLANS[r].label}</span>
+              </button>
+            ))}
+          </div>
+          <Planner key={route} planId={route}/>
+        </>}
+        <div style={{marginTop:28,borderRadius:14,padding:12,fontSize:11,lineHeight:1.7,background:"#faf7f0",color:"#8a8270",border:"1px solid #e7e1d5"}}>
+          ※距離・所要時間は概算（山道・渋滞・駐車を含む目安）。実際の移動はGoogleマップで確認、アクティビティ・遊覧船・かずら橋などは当日の営業/予約状況を必ず確認してください。滞在分は＋−で自分たちのペースに調整できます。
+        </div>
+      </main>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
